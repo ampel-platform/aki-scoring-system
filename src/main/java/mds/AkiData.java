@@ -1,11 +1,13 @@
 package mds;
 
+import lombok.Builder;
 import lombok.Data;
 import lombok.NonNull;
 
 import java.sql.Timestamp;
 
 @Data
+@Builder
 public class AkiData {
 
     @NonNull

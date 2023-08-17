@@ -2,13 +2,15 @@ package mds;
 
 import de.uni_leipzig.mds.evaluation.Rule;
 import de.uni_leipzig.mds.io.proto.TypeUtil;
-import de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.AmpelStatus;
 import de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.RuleEvaluationResultProtoBuf;
+import de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.RuleEvaluationResultProtoBuf.Builder;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
+
+import static de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.AmpelStatus.*;
 
 public class AkiRule implements Rule<AkiData> {
 
@@ -34,7 +36,7 @@ public class AkiRule implements Rule<AkiData> {
         PREVIOUS_CREATININE_VALUE_48H_PRESENT {
             @Override
             State transition(AkiData akiData) {
-                return (akiData.getMinCreatinineValue48Hours() == null)
+                return (akiData.getMinCreatinineValue48Hours() != null)
                         ? State.CHECK_CREATININE_INCREASE_AGAINST_48H
                         : State.CHECK_CREATININE_INCREASE_AGAINST_168H;
             }
@@ -120,21 +122,8 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.GREEN)
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(GREEN)
                                 .build()
                 );
             }
@@ -149,25 +138,12 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.GREEN)
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(GREEN)
                                 .setSeverity("AKIN Dialy")
-                                .setSeverityComment("Nach KDIGO-Kriterien liegteine akuteNierenschädigungvor. Auf " +
-                                        "GrundeinerdokumentiertenDialyse innerhalb der letzten 7 Tage wurde " +
-                                        "derAKI-Alarm deaktiviert")
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
+                                .setSeverityComment("Nach KDIGO-Kriterien liegt eine akute Nierenschädigung vor. Auf " +
+                                        "Grund einer dokumentierten Dialyse innerhalb der letzten 7 Tage wurde der " +
+                                        "AKI-Alarm deaktiviert.")
                                 .build()
                 );
             }
@@ -182,25 +158,12 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.YELLOW)
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(YELLOW)
                                 .setSeverity("AKIN3")
-                                .setSeverityComment("Der Kreatininanstieg weist auf eine akuteNierenschädigung hin " +
+                                .setSeverityComment("Der Kreatininanstieg weist auf eine akute Nierenschädigung hin " +
                                         "(AKIN-Stadium 3 nach KDIGO-Kriterien). Weiterführende Diagnostik- und " +
                                         "Therapiemaßnahmen (KDIGO-Bundle) undnephrologisches Konsil empfohlen.")
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
                                 .build()
                 );
             }
@@ -215,25 +178,12 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.YELLOW)
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(YELLOW)
                                 .setSeverity("AKIN2")
-                                .setSeverityComment("Der Kreatininanstieg weist auf eine akuteNierenschädigung hin " +
+                                .setSeverityComment("Der Kreatininanstieg weist auf eine akute Nierenschädigung hin " +
                                         "(AKIN-Stadium 2 nach KDIGO-Kriterien). Weiterführende Diagnostik- und " +
-                                        "Therapiemaßnahmen (KDIGO-Bundle) und ggf.nephrologisches Konsil empfohlen.")
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
+                                        "Therapiemaßnahmen (KDIGO-Bundle) und ggf. nephrologisches Konsil empfohlen.")
                                 .build()
                 );
             }
@@ -248,25 +198,12 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.YELLOW)
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(YELLOW)
                                 .setSeverity("AKIN1")
-                                .setSeverityComment("Der Kreatininanstieg weist auf eine akuteNierenschädigung hin " +
+                                .setSeverityComment("Der Kreatininanstieg weist auf eine akute Nierenschädigung hin " +
                                         "(AKIN-Stadium 1 nach KDIGO-Kriterien). Weiterführende Diagnostik- und " +
                                         "Therapiemaßnahmen (KDIGO-Bundle) empfohlen.")
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
                                 .build()
                 );
             }
@@ -281,26 +218,13 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.RED)
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(RED)
                                 .setSeverity("AKIN3 VANC")
-                                .setSeverityComment("Der Kreatininanstieg weist auf eine akuteNierenschädigung im " +
+                                .setSeverityComment("Der Kreatininanstieg weist auf eine akute Nierenschädigung im " +
                                         "Zusammenhang mit einer Vancomycintherapie hin (AKIN-Stadium 3 nach " +
                                         "KDIGO-Kriterien). Weiterführende Diagnostik- und Therapiemaßnahmen " +
                                         "(KDIGO-Bundle) undnephrologisches Konsil empfohlen.")
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
                                 .build()
                 );
             }
@@ -315,26 +239,13 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.RED)
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(RED)
                                 .setSeverity("AKIN2 VANC")
-                                .setSeverityComment("Der Kreatininanstieg weist auf eine akuteNierenschädigung im " +
+                                .setSeverityComment("Der Kreatininanstieg weist auf eine akute Nierenschädigung im " +
                                         "Zusammenhang mit einer Vancomycintherapie hin (AKIN-Stadium 2 nach " +
-                                        "KDIGO-Kriterien). Weiterführende Diagnostik- undTherapiemaßnahmen " +
-                                        "(KDIGO-Bundle) und ggf.nephrologisches Konsil empfohlen.")
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
+                                        "KDIGO-Kriterien). Weiterführende Diagnostik- und Therapiemaßnahmen " +
+                                        "(KDIGO-Bundle) und ggf. nephrologisches Konsil empfohlen.")
                                 .build()
                 );
             }
@@ -349,26 +260,13 @@ public class AkiRule implements Rule<AkiData> {
             @Override
             Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
-                        RuleEvaluationResultProtoBuf.newBuilder()
-                                .setRuleName("AKI")
-                                .setRuleVersion("v1.0")
-                                .setPatientId(akiData.getPatientNumber())
-                                .setPatientCaseId(akiData.getPatientCaseNumber())
-                                .setStatus(AmpelStatus.RED)
+                        State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
+                                .setStatus(RED)
                                 .setSeverity("AKIN1 VANC")
-                                .setSeverityComment("Der Kreatininanstieg weist auf eine akuteNierenschädigung im " +
+                                .setSeverityComment("Der Kreatininanstieg weist auf eine akute Nierenschädigung im " +
                                         "Zusammenhang mit einerVancomycintherpie hin (AKIN-Stadium 1 nach " +
                                         "KDIGO-Kriterien). Weiterführende Diagnostik- und Therapiemaßnahmen " +
                                         "(KDIGO-Bundle) empfohlen.")
-                                .setAnalyteName("creatinine")
-                                .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
-                                .setAnalyteValueUnit("µmol/L")
-                                .setAnalyteMeasurementDateTime(
-                                        TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
-                                )
-                                .setResultCreationDateTime(
-                                        TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
-                                )
                                 .build()
                 );
             }
@@ -385,6 +283,23 @@ public class AkiRule implements Rule<AkiData> {
 
         Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
             return Optional.empty();
+        }
+
+        private static Builder populateBaseRuleEvaluationResultProtoBufBuilder(AkiData akiData) {
+            return RuleEvaluationResultProtoBuf.newBuilder()
+                    .setRuleName("AKI")
+                    .setRuleVersion("v1.0")
+                    .setPatientId(akiData.getPatientNumber())
+                    .setPatientCaseId(akiData.getPatientCaseNumber())
+                    .setAnalyteName("creatinine")
+                    .setAnalyteValue(String.valueOf(akiData.getCreatinineValue()))
+                    .setAnalyteValueUnit("µmol/L")
+                    .setAnalyteMeasurementDateTime(
+                            TypeUtil.toProtoBufTimestamp(akiData.getAnalyteMeasurementTime())
+                    )
+                    .setResultCreationDateTime(
+                            TypeUtil.toProtoBufTimestamp(Timestamp.valueOf(LocalDateTime.now()))
+                    );
         }
     }
 
