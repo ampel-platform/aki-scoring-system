@@ -2,13 +2,19 @@ package mds;
 
 import de.uni_leipzig.mds.evaluation.Poller;
 import de.uni_leipzig.mds.evaluation.PollerException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.stream.Stream;
 
 public class AkiDataPoller implements Poller<AkiData> {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AkiDataPoller.class);
 
     private static final String AKI_DATA_SQL_QUERY = """
             WITH BASE_CREATININE_VALUES (patient_nr, case_nr, birthdate, vital_state, measurement_time, value_orig, value_numeric)
@@ -134,21 +140,43 @@ public class AkiDataPoller implements Poller<AkiData> {
     @Override
     public Stream<AkiData> poll() throws PollerException {
         try (var conn = dataSource.getConnection()) {
-            return Stream.of();
+            // TODO: this will blast everything into RAM. Make use of a proper stream solution!
 
-            // TODO: wrap ResultSet into a stream
-//            ResultSet resultSet = conn.createStatement()
-//                    .executeQuery(AKI_DATA_SQL_QUERY);
-//
-//            var akiDataRecords = new ArrayList<AkiData>();
-//            while (resultSet.next()) {
-//                akiDataRecords.add(new AkiData(
-//                        resultSet.getString("patient_nr"),
-//                        resultSet.getTimestamp("measurement_time"),
-//                        resultSet.getFloat("value_numeric")
-//                ));
-//            }
-//            return List.copyOf(akiDataRecords);
+            LOGGER.info("running poller...");
+            ResultSet resultSet = conn.createStatement()
+                    .executeQuery(AKI_DATA_SQL_QUERY);
+
+            var akiDataRecords = new ArrayList<AkiData>();
+            while (resultSet.next()) {
+                if (resultSet.getObject("value_numeric") == null) {
+                    LOGGER.warn(("result set entry for patient `%s` on case `%s` measured at `%s` lacks creatinine " +
+                            "value - thus, dropping it").formatted(
+                            resultSet.getString("patient_nr"),
+                            resultSet.getString("case_nr"),
+                            resultSet.getString("measurement_time")
+                    ));
+                    continue;
+                }
+
+                var akiData = AkiData.builder()
+                        .patientNumber(resultSet.getString("patient_nr"))
+                        .patientCaseNumber(resultSet.getString("case_nr"))
+                        .patientBirthdate(resultSet.getTimestamp("birthdate"))
+                        .isDeceased(resultSet.getString("vital_state").equals("0"))
+                        .analyteMeasurementTime(resultSet.getTimestamp("measurement_time"))
+                        .creatinineValue(resultSet.getFloat("value_numeric"))
+                        .minCreatinineValue48Hours(resultSet.getFloat("creMin48"))
+                        .minCreatinineValue168Hours(resultSet.getFloat("creMin168"))
+                        .hadDialysisInLast168Hours(resultSet.getObject(
+                                "latest_dialysis_execution_time_last_7_days") != null)
+                        .hadVancomycinInLast168Hours(resultSet.getObject(
+                                "latest_vancomycin_time_last_7_days") != null)
+                        .build();
+
+                akiDataRecords.add(akiData);
+            }
+            LOGGER.info("got %d result entries".formatted(akiDataRecords.size()));
+            return akiDataRecords.stream();
         } catch (SQLException e) {
             throw new PollerException("could not fetch data from the database", e);
         }
