@@ -9,20 +9,31 @@ import java.beans.PropertyVetoException;
 import java.sql.SQLException;
 import java.util.concurrent.Executors;
 
+import static java.lang.System.getenv;
+import static java.util.Objects.requireNonNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
 public class Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
-    public static void main(String[] args) throws PropertyVetoException, SQLException {
+    public static void main(String[] args) throws PropertyVetoException, SQLException, InterruptedException {
+        var dbHost = requireNonNull(getenv("DB_HOST"), "database host env var must be specified");
+        var dbPort = requireNonNull(getenv("DB_PORT"), "database port env var must be specified");
+        var dbName = requireNonNull(getenv("DB_NAME"), "database name env var must be specified");
+        var dbUser = requireNonNull(getenv("DB_USER"), "database user env var must be specified");
+        var dbPass = requireNonNull(getenv("DB_PASS"), "database password env var must be specified");
 
-        LOGGER.info("setting up data source");
+        var jdbcUrl = "jdbc:sqlserver://%s:%s;database=%s;encrypt=true;trustServerCertificate=true;"
+                .formatted(dbHost, dbPort, dbName);
+        LOGGER.info("using the following JDBC connection string: `%s`".formatted(jdbcUrl));
+        LOGGER.info("using database user `%s`".formatted(dbUser));
+
+        LOGGER.info("setting up data source for polling");
         var dataSource = new ComboPooledDataSource();
         dataSource.setDriverClass("com.microsoft.sqlserver.jdbc.SQLServerDriver");
-        dataSource.setJdbcUrl("jdbc:sqlserver://localhost:10433;database=AMPEL;encrypt=true;trustServerCertificate=true;");
-        dataSource.setUser("SA");
-        // this is fine since its a local setup - going to be replaced by an env var later on.
-        dataSource.setPassword("aBc123456!");
+        dataSource.setJdbcUrl(jdbcUrl);
+        dataSource.setUser(dbUser);
+        dataSource.setPassword(dbPass);
         dataSource.setLoginTimeout(60);
         dataSource.setTestConnectionOnCheckout(true);
 
