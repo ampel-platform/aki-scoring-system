@@ -14,7 +14,6 @@ import static de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.Ampel
 
 public class AkiRule implements Rule<AkiData> {
 
-    // TODO: use utility function in order to build RuleEvaluationResultProtoBuf instance.
     private enum State {
         AGE_CHECK {
             @Override
