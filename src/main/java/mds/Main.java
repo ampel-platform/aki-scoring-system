@@ -12,6 +12,7 @@ import java.net.InetSocketAddress;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import static java.lang.System.getenv;
@@ -54,9 +55,11 @@ public class Main {
                 .withResultWriter(kafkaResultWriter)
                 .build();
 
-        LOGGER.info("scheduling pipeline invocation every 15s");
+        LOGGER.info("scheduling evaluation pipeline invocation every 15s");
         var scheduler = Executors.newSingleThreadScheduledExecutor();
         scheduler.scheduleAtFixedRate(rulePipeline, 0, 15, SECONDS);
+
+        Runtime.getRuntime().addShutdownHook(new SchedulerShutdownHook(scheduler));
     }
 
     private static List<InetSocketAddress> parseKafkaNodes(String kafkaNodes) {
@@ -67,6 +70,35 @@ public class Main {
                     .toList();
         } catch (Exception e) {
             throw new IllegalArgumentException("specified Kafka nodes cannot be parsed", e);
+        }
+    }
+
+    private static class SchedulerShutdownHook extends Thread {
+        private ExecutorService scheduler;
+
+        public SchedulerShutdownHook(ExecutorService scheduler) {
+            this.scheduler = requireNonNull(scheduler, "scheduler must not be null");
+        }
+
+        @Override
+        public void run() {
+            scheduler.shutdown();
+            try {
+                if (!scheduler.awaitTermination(30, SECONDS)) {
+                    var danglingTasks = scheduler.shutdownNow();
+                    LOGGER.warn("evicted %d dangling tasks".formatted(danglingTasks.size()));
+                    if (!scheduler.awaitTermination(30, SECONDS)) {
+                        LOGGER.error("scheduler did not terminate");
+                    } else {
+                        LOGGER.info("scheduler terminated");
+                    }
+                } else {
+                    LOGGER.info("scheduler terminated");
+                }
+            } catch (InterruptedException e) {
+                scheduler.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }
