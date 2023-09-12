@@ -1,37 +1,37 @@
 package mds;
 
 import lombok.Builder;
-import lombok.Data;
 import lombok.NonNull;
+import lombok.Value;
 
 import java.sql.Timestamp;
 
-@Data
+@Value
 @Builder
 public class AkiData {
 
     @NonNull
-    private String patientNumber;
+    String patientNumber;
 
     @NonNull
-    private String patientCaseNumber;
+    String patientCaseNumber;
 
     @NonNull
-    private Timestamp patientBirthdate;
+    Timestamp patientBirthdate;
 
-    private boolean isDeceased;
-
-    @NonNull
-    private Timestamp analyteMeasurementTime;
+    boolean isDeceased;
 
     @NonNull
-    private Float creatinineValue;
+    Timestamp analyteMeasurementTime;
 
-    private Float minCreatinineValue48Hours;
+    @NonNull
+    Float creatinineValue;
 
-    private Float minCreatinineValue168Hours;
+    Float minCreatinineValue48Hours;
 
-    private boolean hadDialysisInLast168Hours;
+    Float minCreatinineValue168Hours;
 
-    private boolean hadVancomycinInLast168Hours;
+    boolean hadDialysisInLast168Hours;
+
+    boolean hadVancomycinInLast168Hours;
 }

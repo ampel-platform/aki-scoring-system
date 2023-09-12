@@ -42,4 +42,17 @@ class AkiDataPollerTest {
         var polledDataStream = dataPoller.poll();
         assertTrue(polledDataStream.toList().isEmpty());
     }
+
+    // TODO: Move this to an integration test later on. Mocking just for a log message is not the right thing to do!
+    @Test
+    public void stream_should_not_contain_entries_without_creatinine_value() throws SQLException, PollerException {
+        doReturn(mockConnection).when(mockDataSource).getConnection();
+        when(mockConnection.createStatement().executeQuery(anyString())).thenReturn(mockResultSet);
+        when(mockResultSet.next()).thenReturn(true).thenReturn(false);
+        when(mockResultSet.getObject("value_numeric")).thenReturn(null);
+        when(mockResultSet.getString(anyString())).thenReturn(null);
+
+        var polledDataStream = dataPoller.poll();
+        assertTrue(polledDataStream.toList().isEmpty());
+    }
 }

@@ -6,11 +6,15 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.sql.DataSource;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Objects;
+import java.util.Spliterator;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
+import java.util.stream.StreamSupport;
+
+import static java.util.Objects.requireNonNull;
 
 public class AkiDataPoller implements Poller<AkiData> {
 
@@ -134,51 +138,108 @@ public class AkiDataPoller implements Poller<AkiData> {
     private final DataSource dataSource;
 
     public AkiDataPoller(DataSource dataSource) {
-        this.dataSource = Objects.requireNonNull(dataSource, "dataSource must not be null");
+        this.dataSource = requireNonNull(dataSource, "dataSource must not be null");
     }
 
     @Override
     public Stream<AkiData> poll() throws PollerException {
-        try (var conn = dataSource.getConnection()) {
-            // TODO: this will blast everything into RAM. Make use of a proper stream solution!
+        LOGGER.info("running poller...");
+        Connection conn;
+        try {
+            conn = dataSource.getConnection();
+        } catch (SQLException e) {
+            throw new PollerException("could not establish connection to data source", e);
+        }
 
-            LOGGER.info("running poller...");
-            ResultSet resultSet = conn.createStatement()
-                    .executeQuery(AKI_DATA_SQL_QUERY);
+        try {
+            var resultSet = conn.createStatement().executeQuery(AKI_DATA_SQL_QUERY);
+            return StreamSupport.stream(new ResultSetIterator(resultSet), false)
+                    .onClose(() -> {
+                        LOGGER.debug("trying to close connection after stream usage");
+                        try {
+                            conn.close();
+                        } catch (SQLException e) {
+                            throw new RuntimeException("could not close connection to data source after stream usage",
+                                    e);
+                        }
+                    });
+        } catch (SQLException e) {
+            try {
+                conn.close();
+                throw new PollerException("could not fetch data from the database", e);
+            } catch (SQLException ex) {
+                LOGGER.warn("could not close connection to data source", ex);
+                throw new RuntimeException(ex);
+            }
+        }
+    }
 
-            var akiDataRecords = new ArrayList<AkiData>();
-            while (resultSet.next()) {
-                if (resultSet.getObject("value_numeric") == null) {
+    /**
+     * A {@link Spliterator} for iterating over a {@link ResultSet} as used in a {@link Stream}.
+     *
+     * @param resultSet The result set over which to iterate.
+     */
+    private record ResultSetIterator(ResultSet resultSet) implements Spliterator<AkiData> {
+        private ResultSetIterator(ResultSet resultSet) {
+            this.resultSet = requireNonNull(resultSet, "result set must not be null");
+        }
+
+        @Override
+        public boolean tryAdvance(Consumer<? super AkiData> action) {
+            try {
+                if (!resultSet.next()) return false;
+
+                while (!evaluableRecordAtCurrentPosition()) {
                     LOGGER.warn(("result set entry for patient `%s` on case `%s` measured at `%s` lacks creatinine " +
                             "value - thus, dropping it").formatted(
                             resultSet.getString("patient_nr"),
                             resultSet.getString("case_nr"),
                             resultSet.getString("measurement_time")
                     ));
-                    continue;
+                    if (!resultSet.next()) return false;
                 }
-
-                var akiData = AkiData.builder()
-                        .patientNumber(resultSet.getString("patient_nr"))
-                        .patientCaseNumber(resultSet.getString("case_nr"))
-                        .patientBirthdate(resultSet.getTimestamp("birthdate"))
-                        .isDeceased(resultSet.getString("vital_state").equals("0"))
-                        .analyteMeasurementTime(resultSet.getTimestamp("measurement_time"))
-                        .creatinineValue(resultSet.getFloat("value_numeric"))
-                        .minCreatinineValue48Hours(resultSet.getFloat("creMin48"))
-                        .minCreatinineValue168Hours(resultSet.getFloat("creMin168"))
-                        .hadDialysisInLast168Hours(resultSet.getObject(
-                                "latest_dialysis_execution_time_last_7_days") != null)
-                        .hadVancomycinInLast168Hours(resultSet.getObject(
-                                "latest_vancomycin_time_last_7_days") != null)
-                        .build();
-
-                akiDataRecords.add(akiData);
+                action.accept(createEvaluationRecordForCurrentPosition());
+                return true;
+            } catch (SQLException e) {
+                LOGGER.error("cannot advance in result set", e);
+                throw new RuntimeException(e);
             }
-            LOGGER.info("got %d result entries".formatted(akiDataRecords.size()));
-            return akiDataRecords.stream();
-        } catch (SQLException e) {
-            throw new PollerException("could not fetch data from the database", e);
+        }
+
+        @Override
+        public Spliterator<AkiData> trySplit() {
+            return null;
+        }
+
+        @Override
+        public long estimateSize() {
+            return Long.MAX_VALUE;
+        }
+
+        @Override
+        public int characteristics() {
+            return Spliterator.NONNULL | Spliterator.IMMUTABLE;
+        }
+
+        private AkiData createEvaluationRecordForCurrentPosition() throws SQLException {
+            return AkiData.builder()
+                    .patientNumber(resultSet.getString("patient_nr"))
+                    .patientCaseNumber(resultSet.getString("case_nr"))
+                    .patientBirthdate(resultSet.getTimestamp("birthdate"))
+                    .isDeceased(resultSet.getString("vital_state").equals("0"))
+                    .analyteMeasurementTime(resultSet.getTimestamp("measurement_time"))
+                    .creatinineValue(resultSet.getFloat("value_numeric"))
+                    .minCreatinineValue48Hours(resultSet.getFloat("creMin48"))
+                    .minCreatinineValue168Hours(resultSet.getFloat("creMin168"))
+                    .hadDialysisInLast168Hours(resultSet.getObject(
+                            "latest_dialysis_execution_time_last_7_days") != null)
+                    .hadVancomycinInLast168Hours(resultSet.getObject(
+                            "latest_vancomycin_time_last_7_days") != null)
+                    .build();
+        }
+
+        private boolean evaluableRecordAtCurrentPosition() throws SQLException {
+            return resultSet.getObject("value_numeric") != null;
         }
     }
 }
