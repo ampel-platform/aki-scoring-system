@@ -1,4 +1,4 @@
-package mds;
+package de.uni_leipzig.mds;
 
 import lombok.Builder;
 import lombok.NonNull;

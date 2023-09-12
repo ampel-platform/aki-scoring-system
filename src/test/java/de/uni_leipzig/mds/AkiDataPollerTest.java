@@ -1,4 +1,4 @@
-package mds;
+package de.uni_leipzig.mds;
 
 import de.uni_leipzig.mds.evaluation.PollerException;
 import org.junit.jupiter.api.Test;
