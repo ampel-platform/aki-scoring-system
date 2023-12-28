@@ -1,16 +1,15 @@
 package de.uni_leipzig.mds;
 
+import de.uni_leipzig.mds.common.types.proto.TypeUtil;
+import de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelEventProtoBuf;
 import de.uni_leipzig.mds.evaluation.Rule;
-import de.uni_leipzig.mds.io.proto.TypeUtil;
-import de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.RuleEvaluationResultProtoBuf;
-import de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.RuleEvaluationResultProtoBuf.Builder;
 
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
 
-import static de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.AmpelStatus.*;
+import static de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelStatus.*;
 
 public class AkiRule implements Rule<AkiData> {
 
@@ -119,7 +118,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(GREEN)
@@ -135,7 +134,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(GREEN)
@@ -155,7 +154,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(YELLOW)
@@ -175,7 +174,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(YELLOW)
@@ -195,7 +194,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(YELLOW)
@@ -215,7 +214,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(RED)
@@ -236,7 +235,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(RED)
@@ -257,7 +256,7 @@ public class AkiRule implements Rule<AkiData> {
             }
 
             @Override
-            Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+            Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
                 return Optional.of(
                         State.populateBaseRuleEvaluationResultProtoBufBuilder(akiData)
                                 .setStatus(RED)
@@ -280,12 +279,12 @@ public class AkiRule implements Rule<AkiData> {
             return false;
         }
 
-        Optional<RuleEvaluationResultProtoBuf> getFinalStateResult(AkiData akiData) {
+        Optional<AmpelEventProtoBuf> getFinalStateResult(AkiData akiData) {
             return Optional.empty();
         }
 
-        private static Builder populateBaseRuleEvaluationResultProtoBufBuilder(AkiData akiData) {
-            return RuleEvaluationResultProtoBuf.newBuilder()
+        private static AmpelEventProtoBuf.Builder populateBaseRuleEvaluationResultProtoBufBuilder(AkiData akiData) {
+            return AmpelEventProtoBuf.newBuilder()
                     .setRuleName("AKI")
                     .setRuleVersion("v1.0")
                     .setPatientId(akiData.getPatientNumber())
@@ -304,7 +303,7 @@ public class AkiRule implements Rule<AkiData> {
 
 
     @Override
-    public RuleEvaluationResultProtoBuf evaluate(AkiData akiData) {
+    public AmpelEventProtoBuf evaluate(AkiData akiData) {
         var ruleState = State.AGE_CHECK;
 
         do {
