@@ -19,4 +19,10 @@ public class PatientDTO {
     private Date dateOfBirth;
 
     private Boolean deceased;
+
+    PatientDTO(PatientDTO source) {
+        this.id = source.getId();
+        this.deceased = source.getDeceased();
+        this.dateOfBirth = new Date(source.getDateOfBirth().getTime());
+    }
 }

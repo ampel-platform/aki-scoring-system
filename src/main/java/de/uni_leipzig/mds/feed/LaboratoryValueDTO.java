@@ -13,7 +13,13 @@ public class LaboratoryValueDTO {
     @BsonProperty(value = "measurement_time")
     private Date time;
 
-    private Double value;
+    private double value;
 
     private String unit;
+
+    LaboratoryValueDTO(LaboratoryValueDTO source) {
+        this.time = new Date(source.getTime().getTime());
+        this.value = source.getValue();
+        this.unit = source.getUnit();
+    }
 }

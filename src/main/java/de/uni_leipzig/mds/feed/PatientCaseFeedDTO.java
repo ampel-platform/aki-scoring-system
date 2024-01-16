@@ -31,6 +31,29 @@ public class PatientCaseFeedDTO {
     // intended to be used for optimistic locking (concurrent updates to this object)
     private int version;
 
+    public PatientCaseFeedDTO(PatientCaseFeedDTO source) {
+        this.id = source.getId();
+        this.caseId = source.getCaseId();
+        this.version = source.getVersion();
+
+        this.creatinineValues = source.getCreatinineValues()
+                .stream()
+                .map(LaboratoryValueDTO::new)
+                .toList();
+
+        this.vancomycinValues = source.getVancomycinValues()
+                .stream()
+                .map(LaboratoryValueDTO::new)
+                .toList();
+
+        this.dialysisProcedures = source.getDialysisProcedures()
+                .stream()
+                .map(ProcedureDTO::new)
+                .toList();
+
+        this.patient = new PatientDTO(source.getPatient());
+    }
+
     PatientCaseFeedDTO(PatientCaseFeed feed) {
         this.id = (feed.getId());
         this.caseId = feed.getCaseId();
@@ -72,13 +95,4 @@ public class PatientCaseFeedDTO {
                 })
                 .toList();
     }
-
-//    public String toString() {
-//        return ("_ID: %s, Patient-ID: %s, Case-ID: %s, deceased: %s, DOB: %s, CreEvents: %s, VancoEvents: %s, " +
-//                "DialysisEvents:%s")
-//                .formatted(id, patientId, caseId, deceased, dateOfBirth.toString(),
-//                        creatinineEvents,
-//                        vancomycinEvents,
-//                        dialysisEvents);
-//    }
 }

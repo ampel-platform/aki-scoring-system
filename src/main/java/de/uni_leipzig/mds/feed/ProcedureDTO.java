@@ -14,4 +14,9 @@ public class ProcedureDTO {
     private Date time;
 
     private String code;
+
+    ProcedureDTO(ProcedureDTO source) {
+        this.time = new Date(source.getTime().getTime());
+        this.code = source.getCode();
+    }
 }
