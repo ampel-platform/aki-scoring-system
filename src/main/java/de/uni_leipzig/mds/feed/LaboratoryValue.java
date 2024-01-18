@@ -1,27 +1,20 @@
 package de.uni_leipzig.mds.feed;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
 import static java.util.Objects.requireNonNull;
 
+@Getter
+@EqualsAndHashCode
 public final class LaboratoryValue {
-    private final Date time;
-
-    @Getter
+    private final LocalDateTime time;
     private final double value;
-
-    @Getter
     private final String unit;
 
-    LaboratoryValue(LaboratoryValue original) {
-        this.time = original.getTime();
-        this.value = original.getValue();
-        this.unit = original.getUnit();
-    }
-
-    LaboratoryValue(Date time, double value, String unit) {
+    LaboratoryValue(LocalDateTime time, double value, String unit) {
         this.time = requireNonNull(time, "time must not be null");
         this.value = value;
 
@@ -32,7 +25,9 @@ public final class LaboratoryValue {
         this.unit = unit;
     }
 
-    public Date getTime() {
-        return new Date(time.getTime());
+    LaboratoryValue(LaboratoryValueDTO dto) {
+        this.time = dto.getTime();
+        this.value = dto.getValue();
+        this.unit = dto.getUnit();
     }
 }

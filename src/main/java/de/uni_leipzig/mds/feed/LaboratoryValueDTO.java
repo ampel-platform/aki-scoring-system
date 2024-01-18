@@ -1,25 +1,30 @@
 package de.uni_leipzig.mds.feed;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import org.bson.codecs.pojo.annotations.BsonCreator;
 import org.bson.codecs.pojo.annotations.BsonProperty;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
-@Data
-@NoArgsConstructor
-public class LaboratoryValueDTO {
 
-    @BsonProperty(value = "measurement_time")
-    private Date time;
+@Getter
+public final class LaboratoryValueDTO {
 
-    private double value;
+    @BsonProperty(value = "measurementTime")
+    private final LocalDateTime time;
+    private final double value;
+    private final String unit;
 
-    private String unit;
+    @BsonCreator
+    public LaboratoryValueDTO(@BsonProperty(value = "measurementTime") LocalDateTime time,
+                              @BsonProperty(value = "value") double value,
+                              @BsonProperty(value = "unit") String unit) {
+        this.time = time;
+        this.value = value;
+        this.unit = unit;
+    }
 
-    LaboratoryValueDTO(LaboratoryValueDTO source) {
-        this.time = new Date(source.getTime().getTime());
-        this.value = source.getValue();
-        this.unit = source.getUnit();
+    LaboratoryValueDTO(LaboratoryValue entity) {
+        this(entity.getTime(), entity.getValue(), entity.getUnit());
     }
 }

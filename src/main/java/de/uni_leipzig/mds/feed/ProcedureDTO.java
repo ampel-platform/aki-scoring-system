@@ -1,22 +1,26 @@
 package de.uni_leipzig.mds.feed;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import org.bson.codecs.pojo.annotations.BsonCreator;
 import org.bson.codecs.pojo.annotations.BsonProperty;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
-@Data
-@NoArgsConstructor
-public class ProcedureDTO {
+@Getter
+public final class ProcedureDTO {
 
-    @BsonProperty(value = "conduct_time")
-    private Date time;
+    @BsonProperty(value = "conductTime")
+    private final LocalDateTime time;
+    private final String code;
 
-    private String code;
+    @BsonCreator
+    public ProcedureDTO(@BsonProperty(value = "conductTime") LocalDateTime time,
+                        @BsonProperty(value = "code") String code) {
+        this.time = time;
+        this.code = code;
+    }
 
-    ProcedureDTO(ProcedureDTO source) {
-        this.time = new Date(source.getTime().getTime());
-        this.code = source.getCode();
+    ProcedureDTO(Procedure entity) {
+        this(entity.getTime(), entity.getCode());
     }
 }

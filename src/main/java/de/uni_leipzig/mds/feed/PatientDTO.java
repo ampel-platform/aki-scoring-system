@@ -1,28 +1,29 @@
 package de.uni_leipzig.mds.feed;
 
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.Getter;
+import org.bson.codecs.pojo.annotations.BsonCreator;
 import org.bson.codecs.pojo.annotations.BsonProperty;
 
-import java.util.Date;
+import java.time.LocalDateTime;
 
-import static java.util.Objects.requireNonNull;
+@Getter
+public final class PatientDTO {
 
-@Data
-@NoArgsConstructor
-public class PatientDTO {
+    @BsonProperty(value = "patientId")
+    private final String id;
+    private final LocalDateTime dateOfBirth;
+    private final boolean deceased;
 
-    @BsonProperty(value = "patient_id")
-    private String id;
+    @BsonCreator
+    public PatientDTO(@BsonProperty(value = "patientId") String id,
+                      @BsonProperty(value = "dateOfBirth") LocalDateTime dateOfBirth,
+                      @BsonProperty(value = "deceased") boolean deceased) {
+        this.id = id;
+        this.dateOfBirth = dateOfBirth;
+        this.deceased = deceased;
+    }
 
-    @BsonProperty(value = "date_of_birth")
-    private Date dateOfBirth;
-
-    private Boolean deceased;
-
-    PatientDTO(PatientDTO source) {
-        this.id = source.getId();
-        this.deceased = source.getDeceased();
-        this.dateOfBirth = new Date(source.getDateOfBirth().getTime());
+    PatientDTO(Patient entity) {
+        this(entity.getId(), entity.getDateOfBirth(), entity.isDeceased());
     }
 }

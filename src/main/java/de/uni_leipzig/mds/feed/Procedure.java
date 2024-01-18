@@ -1,15 +1,17 @@
 package de.uni_leipzig.mds.feed;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 import static java.util.Objects.requireNonNull;
 
+@Getter
+@EqualsAndHashCode
 public final class Procedure {
-    private final Date time;
-
-    @Getter
+    private final LocalDateTime time;
     private final String code;
 
     Procedure(Procedure original) {
@@ -17,7 +19,7 @@ public final class Procedure {
         this.code = original.getCode();
     }
 
-    Procedure(Date time, String code) {
+    Procedure(LocalDateTime time, String code) {
         this.time = requireNonNull(time, "time must not be null");
 
         requireNonNull(code, "code must not be null");
@@ -27,7 +29,8 @@ public final class Procedure {
         this.code = code;
     }
 
-    public Date getTime() {
-        return new Date(time.getTime());
+    Procedure(ProcedureDTO dto) {
+        this.time = dto.getTime();
+        this.code = dto.getCode();
     }
 }

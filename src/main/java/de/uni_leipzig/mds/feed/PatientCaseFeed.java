@@ -1,57 +1,55 @@
 package de.uni_leipzig.mds.feed;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import org.bson.types.ObjectId;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import static java.util.Objects.requireNonNull;
 
-public class PatientCaseFeed {
+@EqualsAndHashCode
+public final class PatientCaseFeed {
 
+    @Getter
     private final ObjectId id;
-
     @Getter
     private final String caseId;
     private final List<LaboratoryValue> creatinineValues;
     private final List<LaboratoryValue> vancomycinValues;
     private final List<Procedure> dialysisProcedures;
-
     @Getter
-    private Patient patient;
-
+    private final Patient patient;
     @Getter
-    private int version;
+    private final int version;
+
+    private PatientCaseFeed(ObjectId id, String caseId, List<LaboratoryValue> creatinineValues,
+                            List<LaboratoryValue> vancomycinValues, List<Procedure> dialysisProcedures,
+                            Patient patient, int version) {
+        this.id = id;
+        this.caseId = caseId;
+        this.creatinineValues = creatinineValues;
+        this.vancomycinValues = vancomycinValues;
+        this.dialysisProcedures = dialysisProcedures;
+        this.patient = patient;
+        this.version = version;
+    }
 
     PatientCaseFeed(PatientCaseFeedDTO dto) {
         this.id = dto.getId();
         this.caseId = dto.getCaseId();
         this.creatinineValues = dto.getCreatinineValues().stream()
-                .map(cv -> new LaboratoryValue(
-                        cv.getTime(),
-                        cv.getValue(),
-                        cv.getUnit()))
-                .collect(Collectors.toCollection(ArrayList::new));
+                .map(LaboratoryValue::new)
+                .toList();
         this.vancomycinValues = dto.getVancomycinValues().stream()
-                .map(vv -> new LaboratoryValue(
-                        vv.getTime(),
-                        vv.getValue(),
-                        vv.getUnit()
-                ))
-                .collect(Collectors.toCollection(ArrayList::new));
+                .map(LaboratoryValue::new)
+                .toList();
         this.dialysisProcedures = dto.getDialysisProcedures().stream()
-                .map(dp -> new Procedure(
-                        dp.getTime(),
-                        dp.getCode()
-                ))
-                .collect(Collectors.toCollection(ArrayList::new));
-        this.patient = new Patient(
-                dto.getPatient().getId(),
-                dto.getPatient().getDateOfBirth(),
-                dto.getPatient().getDeceased());
+                .map(Procedure::new)
+                .toList();
+        this.patient = new Patient(dto.getPatient());
         this.version = dto.getVersion();
     }
 
@@ -59,20 +57,21 @@ public class PatientCaseFeed {
         this.id = requireNonNull(id, "id must not be null");
         this.patient = requireNonNull(patient, "patient must not be null");
         this.caseId = requireNonNull(caseId, "case id must not be null");
-        this.creatinineValues = new ArrayList<>();
-        this.vancomycinValues = new ArrayList<>();
-        this.dialysisProcedures = new ArrayList<>();
+        this.creatinineValues = List.of();
+        this.vancomycinValues = List.of();
+        this.dialysisProcedures = List.of();
         this.version = 1;
     }
 
-    public void markPatientDeceased() {
-        patient = new Patient(patient.getId(), patient.getDateOfBirth(), true);
-        version++;
+    public PatientCaseFeed markPatientDeceased() {
+        return new PatientCaseFeed(id, caseId, List.copyOf(creatinineValues), List.copyOf(vancomycinValues),
+                List.copyOf(dialysisProcedures), new Patient(patient.getId(), patient.getDateOfBirth(), true),
+                (version + 1));
     }
 
-    public void addCreatinineValue(Date time, double value, String unit) {
+    public PatientCaseFeed addCreatinineValue(LocalDateTime time, double value, String unit) {
         requireNonNull(time, "time must not be null");
-        if (time.before(patient.getDateOfBirth())) {
+        if (time.isBefore(patient.getDateOfBirth())) {
             throw new IllegalArgumentException("creatinine value cannot be measured before patient's date of birth");
         }
 
@@ -85,13 +84,16 @@ public class PatientCaseFeed {
             throw new IllegalArgumentException("unit for creatinine values must not be blank");
         }
 
-        creatinineValues.add(new LaboratoryValue(time, value, unit));
-        version++;
+        var updatedCreatinineValues = new ArrayList<>(creatinineValues);
+        updatedCreatinineValues.add(new LaboratoryValue(time, value, unit));
+
+        return new PatientCaseFeed(id, caseId, List.copyOf(updatedCreatinineValues), List.copyOf(vancomycinValues),
+                List.copyOf(dialysisProcedures), patient, (version + 1));
     }
 
-    public void addVancomycinValue(Date time, double value, String unit) {
+    public PatientCaseFeed addVancomycinValue(LocalDateTime time, double value, String unit) {
         requireNonNull(time, "time must not be null");
-        if (time.before(patient.getDateOfBirth())) {
+        if (time.isBefore(patient.getDateOfBirth())) {
             throw new IllegalArgumentException("vancomycin value cannot be measured before patient's date of birth");
         }
 
@@ -104,13 +106,16 @@ public class PatientCaseFeed {
             throw new IllegalArgumentException("unit for vancomycin values must not be blank");
         }
 
-        vancomycinValues.add(new LaboratoryValue(time, value, unit));
-        version++;
+        var updatedVancomycinValues = new ArrayList<>(vancomycinValues);
+        updatedVancomycinValues.add(new LaboratoryValue(time, value, unit));
+
+        return new PatientCaseFeed(id, caseId, List.copyOf(creatinineValues), List.copyOf(updatedVancomycinValues),
+                List.copyOf(dialysisProcedures), patient, (version + 1));
     }
 
-    public void addDialysisProcedure(Date time, String code) {
+    public PatientCaseFeed addDialysisProcedure(LocalDateTime time, String code) {
         requireNonNull(time, "time must not be null");
-        if (time.before(patient.getDateOfBirth())) {
+        if (time.isBefore(patient.getDateOfBirth())) {
             throw new IllegalArgumentException("dialysis procedure cannot be conducted before patient's date of birth");
         }
 
@@ -119,29 +124,22 @@ public class PatientCaseFeed {
             throw new IllegalArgumentException("code for dialysis procedure must not be blank");
         }
 
-        dialysisProcedures.add(new Procedure(time, code));
-        version++;
-    }
+        var updatedDialysisProcedures = new ArrayList<>(dialysisProcedures);
+        updatedDialysisProcedures.add(new Procedure(time, code));
 
-    public ObjectId getId() {
-        return new ObjectId(id.toHexString());
+        return new PatientCaseFeed(id, caseId, List.copyOf(creatinineValues), List.copyOf(vancomycinValues),
+                List.copyOf(updatedDialysisProcedures), patient, (version + 1));
     }
 
     public List<LaboratoryValue> getCreatinineValues() {
-        return creatinineValues.stream()
-                .map(LaboratoryValue::new)
-                .toList();
+        return List.copyOf(creatinineValues);
     }
 
     public List<LaboratoryValue> getVancomycinValues() {
-        return vancomycinValues.stream()
-                .map(LaboratoryValue::new)
-                .toList();
+        return List.copyOf(vancomycinValues);
     }
 
     public List<Procedure> getDialysisProcedures() {
-        return dialysisProcedures.stream()
-                .map(Procedure::new)
-                .toList();
+        return List.copyOf(dialysisProcedures);
     }
 }

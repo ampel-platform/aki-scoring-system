@@ -1,21 +1,22 @@
 package de.uni_leipzig.mds.feed;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import java.util.Date;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 import static java.util.Objects.requireNonNull;
 
+@Getter
+@EqualsAndHashCode
 public final class Patient {
 
-    @Getter
     private final String id;
-    private final Date dateOfBirth;
-
-    @Getter
+    private final LocalDateTime dateOfBirth;
     private final boolean deceased;
 
-    Patient(String id, Date dateOfBirth, boolean deceased) {
+    Patient(String id, LocalDateTime dateOfBirth, boolean deceased) {
         requireNonNull(id, "id must not be null");
         if (id.isBlank()) {
             throw new IllegalArgumentException("id must not be blank");
@@ -26,7 +27,9 @@ public final class Patient {
         this.deceased = deceased;
     }
 
-    public Date getDateOfBirth() {
-        return new Date(dateOfBirth.getTime());
+    Patient(PatientDTO dto) {
+        this.id = dto.getId();
+        this.dateOfBirth = dto.getDateOfBirth();
+        this.deceased = dto.isDeceased();
     }
 }
