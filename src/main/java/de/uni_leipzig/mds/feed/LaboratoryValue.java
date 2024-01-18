@@ -4,6 +4,7 @@ import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 import static java.util.Objects.requireNonNull;
 
@@ -15,7 +16,9 @@ public final class LaboratoryValue {
     private final String unit;
 
     LaboratoryValue(LocalDateTime time, double value, String unit) {
-        this.time = requireNonNull(time, "time must not be null");
+        requireNonNull(time, "time must not be null");
+        this.time = time.truncatedTo(ChronoUnit.MILLIS);
+
         this.value = value;
 
         requireNonNull(unit, "unit must not be null");

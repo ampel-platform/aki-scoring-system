@@ -23,7 +23,9 @@ public final class Patient {
         }
         this.id = id;
 
-        this.dateOfBirth = requireNonNull(dateOfBirth, "date of birth must not be null");
+        requireNonNull(dateOfBirth, "date of birth must not be null");
+        this.dateOfBirth = dateOfBirth.truncatedTo(ChronoUnit.MILLIS);
+
         this.deceased = deceased;
     }
 

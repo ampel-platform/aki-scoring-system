@@ -20,7 +20,8 @@ public final class Procedure {
     }
 
     Procedure(LocalDateTime time, String code) {
-        this.time = requireNonNull(time, "time must not be null");
+        requireNonNull(time, "time must not be null");
+        this.time = time.truncatedTo(ChronoUnit.MILLIS);
 
         requireNonNull(code, "code must not be null");
         if (code.isBlank()) {
