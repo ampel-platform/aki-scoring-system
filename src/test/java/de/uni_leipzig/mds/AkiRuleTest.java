@@ -5,7 +5,7 @@ import org.junit.jupiter.api.Test;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 
-import static de.uni_leipzig.mds.io.proto.generated.rule_evaluation_result.AmpelStatus.*;
+import static de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelStatus.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 class AkiRuleTest {
