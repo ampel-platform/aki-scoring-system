@@ -1,4 +1,4 @@
-package de.uni_leipzig.mds.feed;
+package de.uni_leipzig.mds.data.db;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -13,24 +13,26 @@ import java.util.List;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
+/**
+ * A factory for creating persistence related clients.
+ */
 public final class ClientFactory {
 
     private ClientFactory() {
     }
 
-    public static MongoClient defaultStorageClient(String applicationName, ConnectionString connectionString) {
+    public static MongoClient createDBClient(ConnectionString connString) {
         var clientSettings = MongoClientSettings.builder()
-                .codecRegistry(createCodecRegistry())
-                .applicationName(applicationName)
-                .applyConnectionString(connectionString)
+                .codecRegistry(createMongoDBCodecRegistry())
+                .applyConnectionString(connString)
                 .build();
 
         return MongoClients.create(clientSettings);
     }
 
-    private static CodecRegistry createCodecRegistry() {
+    private static CodecRegistry createMongoDBCodecRegistry() {
         var pojoCodecProvider = PojoCodecProvider.builder()
-                .register(PatientCaseFeedDTO.class, LaboratoryValueDTO.class, PatientDTO.class, ProcedureDTO.class)
+                .register(LaboratoryValue.class, Patient.class, Procedure.class)
                 .conventions(List.of(Conventions.ANNOTATION_CONVENTION))
                 .build();
         var pojoCodecRegistry = fromProviders(pojoCodecProvider);
