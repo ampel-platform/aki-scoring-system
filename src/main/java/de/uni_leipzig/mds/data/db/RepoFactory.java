@@ -7,6 +7,7 @@ import org.bson.BsonElement;
 import org.bson.BsonInt32;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import static com.mongodb.WriteConcern.ACKNOWLEDGED;
 import static java.util.Objects.requireNonNull;
@@ -50,13 +51,12 @@ public final class RepoFactory {
                 )
         ), uniquenessOptions);
 
-//        // TODO: setup TTL for entries based on a specific time field
-//        var expirationOptions = new IndexOptions().expireAfter(8L, TimeUnit.DAYS);
-//        coll.createIndex(new BsonDocument(
-//                List.of(
-//                        new BsonElement("measurementTime", new BsonInt32(1))
-//                )
-//        ), expirationOptions);
+        var expirationOptions = new IndexOptions().expireAfter(8L, TimeUnit.DAYS);
+        coll.createIndex(new BsonDocument(
+                List.of(
+                        new BsonElement("measurementTime", new BsonInt32(1))
+                )
+        ), expirationOptions);
 
         return new LaboratoryValueRepo(coll);
     }
@@ -66,8 +66,14 @@ public final class RepoFactory {
         var coll = db.getCollection(ProcedureRepo.COLLECTION_NAME, Procedure.class)
                 .withWriteConcern(ACKNOWLEDGED);
 
+        var expirationOptions = new IndexOptions().expireAfter(8L, TimeUnit.DAYS);
+        coll.createIndex(new BsonDocument(
+                List.of(
+                        new BsonElement("conductTime", new BsonInt32(1))
+                )
+        ), expirationOptions);
+
         // TODO: setup unique index for surgical procedure code sequence number
-        // TODO: setup TTL for entries based on a specific time field
         return new ProcedureRepo(coll);
     }
 
