@@ -11,7 +11,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * A persistence repository dealing with {@link Procedure}s.
  */
-public final class ProcedureRepo {
+final class ProcedureRepo {
 
     public static final String COLLECTION_NAME = "procedures";
 

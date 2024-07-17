@@ -11,7 +11,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * A persistence repository dealing with {@link LaboratoryValue}s.
  */
-public final class LaboratoryValueRepo {
+final class LaboratoryValueRepo {
 
     public static final String COLLECTION_NAME = "lab_values";
 

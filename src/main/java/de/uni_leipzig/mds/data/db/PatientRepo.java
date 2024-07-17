@@ -11,7 +11,7 @@ import static java.util.Objects.requireNonNull;
 /**
  * A persistence repository dealing with {@link Patient}s.
  */
-public final class PatientRepo {
+final class PatientRepo {
 
     public static final String COLLECTION_NAME = "patients";
 
