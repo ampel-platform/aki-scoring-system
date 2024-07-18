@@ -1,6 +1,6 @@
 package de.uni_leipzig.mds;
 
-import de.uni_leipzig.mds.data.db.AKIRepo;
+import de.uni_leipzig.mds.data.db.IAKIRepo;
 import de.uni_leipzig.mds.data.db.LaboratoryValue;
 import de.uni_leipzig.mds.data.db.Patient;
 import de.uni_leipzig.mds.data.db.Procedure;
@@ -15,12 +15,14 @@ import io.vavr.Tuple2;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDateTime;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Predicate;
 
 import static de.uni_leipzig.mds.WorkflowFactory.PATIENT_FEED_PARAM;
 import static de.uni_leipzig.mds.data.db.Codes.*;
+import static java.time.temporal.ChronoUnit.DAYS;
 import static java.util.Objects.requireNonNull;
 
 /**
@@ -37,15 +39,18 @@ public class MessageProcessor implements Runnable {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MessageProcessor.class);
 
+    private static final long MAX_LABORATORY_MESSAGE_AGE_IN_DAYS = 8;
+    private static final long MAX_PROCEDURE_MESSAGE_AGE_IN_DAYS = 8;
+
     private final BlockingQueue<Tuple2<KafkaTopic, Object>> incomingMessageChannel;
 
     private final BlockingQueue<WorkflowPipelineInput> workflowInputChannel;
 
-    private final AKIRepo akiRepo;
+    private final IAKIRepo akiRepo;
 
     public MessageProcessor(BlockingQueue<Tuple2<KafkaTopic, Object>> incomingMessageChannel,
                             BlockingQueue<WorkflowPipelineInput> workflowInputChannel,
-                            AKIRepo akiRepo) {
+                            IAKIRepo akiRepo) {
         this.incomingMessageChannel = requireNonNull(incomingMessageChannel, "incoming message channel must not be " +
                 "null");
         this.workflowInputChannel = requireNonNull(workflowInputChannel, "workflow message channel must not be null");
@@ -60,7 +65,7 @@ public class MessageProcessor implements Runnable {
             try {
                 var message = incomingMessageChannel.poll(10, TimeUnit.SECONDS);
                 if (message == null) {
-                     LOGGER.trace("could not find new messages");
+                    LOGGER.trace("could not find new messages");
                     continue;
                 }
 
@@ -87,6 +92,12 @@ public class MessageProcessor implements Runnable {
     private void handleLaboratoryValueMessage(LaboratoryValueMessage message) {
         if (!getConsiderableLabValueFilter().test(message)) {
             LOGGER.trace("dropping laboratory message since it neither resembles a creatinine nor a vancomycin value");
+            return;
+        }
+
+        if (isLabValueOlderThanMaxAllowedAge().test(message)) {
+            LOGGER.warn("dropping laboratory message since it's older than %d days and thus not relevant anymore"
+                    .formatted(MAX_LABORATORY_MESSAGE_AGE_IN_DAYS));
             return;
         }
 
@@ -125,6 +136,13 @@ public class MessageProcessor implements Runnable {
                 .or(getVancomycinValueFilter());
     }
 
+    private Predicate<LaboratoryValueMessage> isLabValueOlderThanMaxAllowedAge() {
+        return (message) -> {
+            var ageInDays = Math.abs(message.getMeasurementTime().until(LocalDateTime.now(), DAYS));
+            return ageInDays > MAX_LABORATORY_MESSAGE_AGE_IN_DAYS;
+        };
+    }
+
     private Predicate<LaboratoryValueMessage> getCreatinineValueFilter() {
         return (message) -> LAB_CODES_CREATININE.contains(message.getAnalyteCode().toUpperCase());
     }
@@ -136,6 +154,12 @@ public class MessageProcessor implements Runnable {
     private void handleProcedureMessage(ProcedureMessage message) {
         if (!getConsiderableProcedureFilter().test(message)) {
             LOGGER.trace("dropping procedure message since it does not resemble a dialysis procedure");
+            return;
+        }
+
+        if (isProcedureOlderThanMaxAllowedAgeInDays().test(message)) {
+            LOGGER.warn("dropping procedure message since it's older than %d days and thus not relevant anymore"
+                    .formatted(MAX_PROCEDURE_MESSAGE_AGE_IN_DAYS));
             return;
         }
 
@@ -151,6 +175,13 @@ public class MessageProcessor implements Runnable {
 
     private Predicate<ProcedureMessage> getConsiderableProcedureFilter() {
         return (message) -> PROCEDURE_CODES_DIALYSIS.contains(message.getProcedureCode().toUpperCase());
+    }
+
+    private Predicate<ProcedureMessage> isProcedureOlderThanMaxAllowedAgeInDays() {
+        return (message) -> {
+            var ageInDays = Math.abs(message.getPerformedOn().until(LocalDateTime.now(), DAYS));
+            return ageInDays > MAX_PROCEDURE_MESSAGE_AGE_IN_DAYS;
+        };
     }
 
     private void handlePatientMessage(PatientMessage message) {
