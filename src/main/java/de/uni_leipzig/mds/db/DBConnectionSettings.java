@@ -1,4 +1,4 @@
-package de.uni_leipzig.mds.data.db;
+package de.uni_leipzig.mds.db;
 
 import com.mongodb.ConnectionString;
 import lombok.Getter;

@@ -1,4 +1,4 @@
-package de.uni_leipzig.mds.data.db;
+package de.uni_leipzig.mds.db;
 
 import com.mongodb.ConnectionString;
 import com.mongodb.MongoClientSettings;
@@ -32,7 +32,7 @@ public final class ClientFactory {
 
     private static CodecRegistry createMongoDBCodecRegistry() {
         var pojoCodecProvider = PojoCodecProvider.builder()
-                .register(LaboratoryValue.class, Patient.class, Procedure.class)
+                .register(LabValue.class, MedicalCase.class, Patient.class, Procedure.class)
                 .conventions(List.of(Conventions.ANNOTATION_CONVENTION))
                 .build();
         var pojoCodecRegistry = fromProviders(pojoCodecProvider);

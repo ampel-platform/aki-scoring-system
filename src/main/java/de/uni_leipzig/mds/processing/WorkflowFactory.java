@@ -1,4 +1,4 @@
-package de.uni_leipzig.mds;
+package de.uni_leipzig.mds.processing;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -9,20 +9,20 @@ import com.google.protobuf.util.JsonFormat;
 import de.uni_leipzig.mds.common.types.proto.TypeUtil;
 import de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelEventProtoBuf;
 import de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelStatus;
-import de.uni_leipzig.mds.data.db.LaboratoryValue;
-import de.uni_leipzig.mds.data.db.PatientCaseFeed;
 import de.uni_leipzig.mds.evaluation.workflow.Step;
 import de.uni_leipzig.mds.evaluation.workflow.Transition;
 import de.uni_leipzig.mds.evaluation.workflow.Workflow;
 import de.uni_leipzig.mds.evaluation.workflow.task.Runner;
-import de.uni_leipzig.mds.io.connection.AmpelMessage;
-import de.uni_leipzig.mds.io.connection.serialization.types.PatientCaseKey;
+import de.uni_leipzig.mds.io.message.Message;
+import de.uni_leipzig.mds.processing.context.WorkflowLabValue;
+import de.uni_leipzig.mds.processing.context.WorkflowMedicalCase;
 import io.vavr.control.Either;
 import lombok.Builder;
 import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -36,7 +36,7 @@ public class WorkflowFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WorkflowFactory.class);
 
-    public static final String PATIENT_FEED_PARAM = "PatientFeed";
+    public static final String MEDICAL_CASE_PARAM = "MedicalCase";
     private static final String TRIGGER_ANALYTE = "TriggerAnalyte";
     private static final String LOWEST_CRE_48H_PARAM = "CreMin48";
     private static final String LOWEST_CRE_168H_PARAM = "CreMin168";
@@ -45,7 +45,8 @@ public class WorkflowFactory {
     }
 
     /**
-     * Creates a {@link Workflow} that evaluates a {@link PatientCaseFeed} with respect to an acute kidney injury (AKI).
+     * Creates a {@link Workflow} that evaluates a {@link WorkflowMedicalCase} with respect to an acute kidney injury
+     * (AKI).
      *
      * @return The {@link Workflow} instance.
      */
@@ -55,23 +56,23 @@ public class WorkflowFactory {
         return Workflow.workflow("aki-ruleset",
                         Step.step("preparation",
                                 Runner.runner().apply((ctx, inputParams) -> {
-                                    var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
+                                    var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
 
                                     // This has to be there otherwise the workflow wouldn't have been started.
-                                    var triggerValue = patientFeed.getCreatinineValues().getFirst();
+                                    var triggerValue = medicalCase.getLatestCreatinineValue().get();
 
-                                    summaryBuilder.patientDateOfBirth(patientFeed.getDateOfBirth());
+                                    summaryBuilder.patientDateOfBirth(medicalCase.patient().dateOfBirth());
                                     return Either.right(Optional.of(
                                             inputParams.set(TRIGGER_ANALYTE, triggerValue)
                                     ));
                                 })))
                 .withStep(Step.step("is-of-full-age",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var ageYears = Math.abs(ChronoUnit.YEARS.between(triggerValue.getTime(),
-                                    patientFeed.getDateOfBirth()));
+                            var ageYears = Math.abs(ChronoUnit.YEARS.between(triggerValue.measuringTime(),
+                                    medicalCase.patient().dateOfBirth()));
 
                             return Either.right(Optional.of(
                                     inputParams.set("result", (ageYears >= 18))
@@ -79,14 +80,14 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-previous-cre-value-168h-exists",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var previousCreValueExists = !patientFeed.getCreatinineValues().stream()
+                            var previousCreValueExists = !medicalCase.getCreatinineValuesDesc().stream()
                                     .skip(1)
-                                    .takeWhile(labValue -> labValue.getTime()
-                                            .isAfter(triggerValue.getTime().minusHours(168))
-                                            && labValue.getTime().isBefore(triggerValue.getTime()))
+                                    .takeWhile(labValue -> labValue.measuringTime()
+                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            && labValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .toList()
                                     .isEmpty();
 
@@ -96,25 +97,25 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("calculate-cre-min-values",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var minCre168 = patientFeed.getCreatinineValues().stream()
+                            var minCre168 = medicalCase.getCreatinineValuesDesc().stream()
                                     .skip(1)
-                                    .filter(labValue -> labValue.getTime()
-                                            .isAfter(triggerValue.getTime().minusHours(168))
-                                            && labValue.getTime().isBefore(triggerValue.getTime()))
-                                    .min(Comparator.comparing(LaboratoryValue::getValue));
+                                    .filter(labValue -> labValue.measuringTime()
+                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            && labValue.measuringTime().isBefore(triggerValue.measuringTime()))
+                                    .min(Comparator.comparing(WorkflowLabValue::analyteValue));
 
-                            var minCre48 = patientFeed.getCreatinineValues().stream()
+                            var minCre48 = medicalCase.getCreatinineValuesDesc().stream()
                                     .skip(1)
-                                    .filter(labValue -> labValue.getTime()
-                                            .isAfter(triggerValue.getTime().minusHours(48))
-                                            && labValue.getTime().isBefore(triggerValue.getTime()))
-                                    .min(Comparator.comparing(LaboratoryValue::getValue));
+                                    .filter(labValue -> labValue.measuringTime()
+                                            .isAfter(triggerValue.measuringTime().minusHours(48))
+                                            && labValue.measuringTime().isBefore(triggerValue.measuringTime()))
+                                    .min(Comparator.comparing(WorkflowLabValue::analyteValue));
 
-                            summaryBuilder.minCre48(minCre48.map(LaboratoryValue::getValue).orElse(null));
-                            summaryBuilder.minCre168(minCre168.map(LaboratoryValue::getValue).orElse(null));
+                            summaryBuilder.minCre48(minCre48.map(WorkflowLabValue::analyteValue).orElse(null));
+                            summaryBuilder.minCre168(minCre168.map(WorkflowLabValue::analyteValue).orElse(null));
 
                             return Either.right(Optional.of(
                                     inputParams
@@ -125,7 +126,7 @@ public class WorkflowFactory {
                 .withStep(Step.step("check-cre-min-48h-exists",
                         Runner.runner().apply((ctx, inputParams) -> {
                             //noinspection unchecked
-                            var minCre48 = (Optional<LaboratoryValue>) inputParams.get(LOWEST_CRE_48H_PARAM);
+                            var minCre48 = (Optional<WorkflowLabValue>) inputParams.get(LOWEST_CRE_48H_PARAM);
 
                             return Either.right(Optional.of(
                                     inputParams.set("result", minCre48.isPresent())
@@ -133,12 +134,12 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-cre-increase-against-48h",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
                             //noinspection unchecked
-                            var minCre48 = (Optional<LaboratoryValue>) inputParams.get(LOWEST_CRE_48H_PARAM);
+                            var minCre48 = (Optional<WorkflowLabValue>) inputParams.get(LOWEST_CRE_48H_PARAM);
 
                             //noinspection OptionalGetWithoutIsPresent
-                            var result = (triggerValue.getValue() - minCre48.get().getValue()) >= 26.5;
+                            var result = (triggerValue.analyteValue() - minCre48.get().analyteValue()) >= 26.5;
 
                             return Either.right(Optional.of(
                                     inputParams.set("result", result)
@@ -146,12 +147,12 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-cre-increase-against-168h",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
                             //noinspection unchecked
-                            var minCre168 = (Optional<LaboratoryValue>) inputParams.get(LOWEST_CRE_168H_PARAM);
+                            var minCre168 = (Optional<WorkflowLabValue>) inputParams.get(LOWEST_CRE_168H_PARAM);
 
                             //noinspection OptionalGetWithoutIsPresent
-                            var result = (triggerValue.getValue() / minCre168.get().getValue()) >= 1.5;
+                            var result = (triggerValue.analyteValue() / minCre168.get().analyteValue()) >= 1.5;
 
                             return Either.right(Optional.of(
                                     inputParams.set("result", result)
@@ -159,13 +160,13 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-dialysis-in-last-168h",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var numDialysis168 = patientFeed.getDialysisProcedures().stream()
+                            var numDialysis168 = medicalCase.procedures().stream()
                                     .filter(procedure -> (
-                                            procedure.getTime().isAfter(triggerValue.getTime().minusHours(168))
-                                                    && procedure.getTime().isBefore(triggerValue.getTime())
+                                            procedure.conductTime().isAfter(triggerValue.measuringTime().minusHours(168))
+                                                    && procedure.conductTime().isBefore(triggerValue.measuringTime())
                                     ))
                                     .count();
 
@@ -177,13 +178,13 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-cre-3-fold-increase-168h",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
                             //noinspection unchecked
-                            var minCre168 = (Optional<LaboratoryValue>) inputParams.get(LOWEST_CRE_168H_PARAM);
+                            var minCre168 = (Optional<WorkflowLabValue>) inputParams.get(LOWEST_CRE_168H_PARAM);
 
                             //noinspection OptionalGetWithoutIsPresent
-                            var result = ((triggerValue.getValue() / minCre168.get().getValue()) >= 3.0)
-                                    || (triggerValue.getValue() >= 353.6);
+                            var result = ((triggerValue.analyteValue() / minCre168.get().analyteValue()) >= 3.0)
+                                    || (triggerValue.analyteValue() >= 353.6);
 
                             return Either.right(Optional.of(
                                     inputParams.set("result", result)
@@ -191,12 +192,12 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-cre-2-fold-increase-168h",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
                             //noinspection unchecked
-                            var minCre168 = (Optional<LaboratoryValue>) inputParams.get(LOWEST_CRE_168H_PARAM);
+                            var minCre168 = (Optional<WorkflowLabValue>) inputParams.get(LOWEST_CRE_168H_PARAM);
 
                             //noinspection OptionalGetWithoutIsPresent
-                            var result = (triggerValue.getValue() / minCre168.get().getValue()) >= 2.0;
+                            var result = (triggerValue.analyteValue() / minCre168.get().analyteValue()) >= 2.0;
 
                             return Either.right(Optional.of(
                                     inputParams.set("result", result)
@@ -204,13 +205,13 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-akin-3-vancomycin",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var numVancomycinInLast168h = patientFeed.getVancomycinValues().stream()
-                                    .filter(vancoValue -> vancoValue.getTime()
-                                            .isAfter(triggerValue.getTime().minusHours(168))
-                                            && vancoValue.getTime().isBefore(triggerValue.getTime()))
+                            var numVancomycinInLast168h = medicalCase.vancomycinValues().stream()
+                                    .filter(vancoValue -> vancoValue.measuringTime()
+                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            && vancoValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .count();
 
                             summaryBuilder.vancomycin168(numVancomycinInLast168h > 0);
@@ -221,13 +222,13 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-akin-2-vancomycin",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var numVancomycinInLast168h = patientFeed.getVancomycinValues().stream()
-                                    .filter(vancoValue -> vancoValue.getTime()
-                                            .isAfter(triggerValue.getTime().minusHours(168))
-                                            && vancoValue.getTime().isBefore(triggerValue.getTime()))
+                            var numVancomycinInLast168h = medicalCase.vancomycinValues().stream()
+                                    .filter(vancoValue -> vancoValue.measuringTime()
+                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            && vancoValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .count();
 
                             summaryBuilder.vancomycin168(numVancomycinInLast168h > 0);
@@ -238,13 +239,13 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("check-akin-1-vancomycin",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var numVancomycinInLast168h = patientFeed.getVancomycinValues().stream()
-                                    .filter(vancoValue -> vancoValue.getTime()
-                                            .isAfter(triggerValue.getTime().minusHours(168))
-                                            && vancoValue.getTime().isBefore(triggerValue.getTime()))
+                            var numVancomycinInLast168h = medicalCase.vancomycinValues().stream()
+                                    .filter(vancoValue -> vancoValue.measuringTime()
+                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            && vancoValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .count();
 
                             summaryBuilder.vancomycin168(numVancomycinInLast168h > 0);
@@ -255,25 +256,25 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-green",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.GREEN)
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -289,29 +290,29 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-green-akin-dialy",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.GREEN)
                                                         .setSeverity("AKIN Dialy")
                                                         .setSeverityComment("Nach KDIGO-Kriterien liegt eine akute " +
                                                                 "Nierenschädigung vor. Auf Grund einer dokumentierten Dialyse " +
                                                                 "innerhalb der letzten 7 Tage wurde der AKI-Alarm deaktiviert.")
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -327,30 +328,30 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-yellow-akin-1",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.YELLOW)
                                                         .setSeverity("AKIN1")
                                                         .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung hin (AKIN-Stadium 1 nach KDIGO-Kriterien). " +
                                                                 "Weiterführende Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) " +
                                                                 "empfohlen.")
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -366,30 +367,30 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-yellow-akin-2",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.YELLOW)
                                                         .setSeverity("AKIN2")
                                                         .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung hin (AKIN-Stadium 2 nach KDIGO-Kriterien). " +
                                                                 "Weiterführende Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) " +
                                                                 "und ggf. nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -405,30 +406,30 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-yellow-akin-3",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.YELLOW)
                                                         .setSeverity("AKIN3")
                                                         .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung hin (AKIN-Stadium 3 nach KDIGO-Kriterien). " +
                                                                 "Weiterführende Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) " +
                                                                 "und nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -444,30 +445,30 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-red-akin-1",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.RED)
                                                         .setSeverity("AKIN1")
                                                         .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung im Zusammenhang mit einer Vancomycintherpie hin" +
                                                                 " (AKIN-Stadium 1 nach KDIGO-Kriterien). Weiterführende " +
                                                                 "Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) empfohlen.")
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -483,19 +484,19 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-red-akin-2",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.RED)
                                                         .setSeverity("AKIN2")
                                                         .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
@@ -503,11 +504,11 @@ public class WorkflowFactory {
                                                                 "hin (AKIN-Stadium 2 nach KDIGO-Kriterien). Weiterführende " +
                                                                 "Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) und ggf. " +
                                                                 "nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -523,19 +524,19 @@ public class WorkflowFactory {
                         })))
                 .withStep(Step.step("ampel-red-akin-3",
                         Runner.runner().apply((ctx, inputParams) -> {
-                            var patientFeed = (PatientCaseFeed) inputParams.get(PATIENT_FEED_PARAM);
-                            var triggerValue = (LaboratoryValue) inputParams.get(TRIGGER_ANALYTE);
+                            var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
+                            var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
                                 ctx.emitAmpelEvent(
-                                        new AmpelMessage<>(
-                                                new PatientCaseKey(patientFeed.getPatientId(),
-                                                        patientFeed.getCaseId()),
+                                        new Message<>(
+                                                medicalCase.caseId(),
+                                                null,
                                                 AmpelEventProtoBuf.newBuilder()
                                                         .setRuleName("AKI")
                                                         .setRuleVersion("v0.1.0")
-                                                        .setPatientId(patientFeed.getPatientId())
-                                                        .setPatientCaseId(patientFeed.getCaseId())
+                                                        .setPatientId(medicalCase.patient().id())
+                                                        .setPatientCaseId(medicalCase.caseId())
                                                         .setStatus(AmpelStatus.RED)
                                                         .setSeverity("AKIN3")
                                                         .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
@@ -543,11 +544,11 @@ public class WorkflowFactory {
                                                                 "hin (AKIN-Stadium 3 nach KDIGO-Kriterien). Weiterführende " +
                                                                 "Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) und " +
                                                                 "nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.getAnalyteCode())
-                                                        .setAnalyteValue(triggerValue.getValue().toString())
-                                                        .setAnalyteValueUnit(triggerValue.getUnit())
+                                                        .setAnalyteName(triggerValue.analyte())
+                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
                                                         .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.getTime(), ZoneOffset.UTC
+                                                                triggerValue.measuringTime(), ZoneOffset.UTC
                                                         ))
                                                         .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
                                                                 LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
@@ -673,9 +674,7 @@ public class WorkflowFactory {
     @Builder
     private static class Summary {
         @JsonProperty("patient_date_of_birth")
-        private final LocalDateTime patientDateOfBirth;
-        //        @JsonProperty("trigger_analyte_value")
-//        private final double triggerAnalyteValue;
+        private final LocalDate patientDateOfBirth;
         @JsonProperty("min_cre_48")
         private Double minCre48;
         @JsonProperty("min_cre_168")
