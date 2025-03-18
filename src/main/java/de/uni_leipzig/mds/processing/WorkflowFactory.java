@@ -72,7 +72,7 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             var ageYears = Math.abs(ChronoUnit.YEARS.between(triggerValue.measuringTime(),
-                                    medicalCase.patient().dateOfBirth()));
+                                    medicalCase.patient().dateOfBirth().atStartOfDay()));
 
                             return Either.right(Optional.of(
                                     inputParams.set("result", (ageYears >= 18))
