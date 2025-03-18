@@ -7,6 +7,7 @@ import de.uni_leipzig.mds.evaluation.workflow.WorkflowScheduler;
 import de.uni_leipzig.mds.io.kafka.*;
 import de.uni_leipzig.mds.io.message.Message;
 import de.uni_leipzig.mds.io.message.laboratory.LaboratoryMessage;
+import de.uni_leipzig.mds.io.message.medcase.MedCaseMessage;
 import de.uni_leipzig.mds.io.message.patient.PatientMessage;
 import de.uni_leipzig.mds.io.message.procedure.ProcedureMessage;
 import de.uni_leipzig.mds.processing.MessageProcessor;
@@ -85,6 +86,30 @@ public class Main {
                         })
                 .build());
 
+        var medicalCaseStreamReader = new Thread(KafkaReader.<String, MedCaseMessage>builder()
+                .useBootstrapServers(kafkaBootstrapServers)
+                .forTopic(KafkaTopics.MEDICAL_CASES)
+                .withKafkaReaderConfig(KafkaReaderConfig.builder()
+                        .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, kafkaConsumerGroupId)
+                        .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.ENABLE_AUTO_COMMIT, false)
+                        .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, Long.parseLong(kafkaConsumerCommitTimeoutMs))
+                        .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
+                        .build())
+                .withDeserializationStrategy(
+                        new KafkaDeserializationStrategy<>(
+                                new StringDeserializer(),
+                                KafkaSerde.createKafkaDeserializer(MedCaseMessage.class)))
+                .withMessageConsumer(
+                        (Message<String, MedCaseMessage> m) -> {
+                            try {
+                                incomingMessages.put(new Tuple2<>(KafkaTopics.MEDICAL_CASES, m.body()));
+                                LOGGER.trace("enqueued message of topic `{}`", KafkaTopics.MEDICAL_CASES.getName());
+                            } catch (InterruptedException e) {
+                                LOGGER.warn("interrupted while enqueueing incoming events", e);
+                            }
+                        })
+                .build());
+
         var procedureStreamReader = new Thread(KafkaReader.<String, ProcedureMessage>builder()
                 .useBootstrapServers(kafkaBootstrapServers)
                 .forTopic(KafkaTopics.PROCEDURES)
@@ -114,6 +139,8 @@ public class Main {
         laboratoryStreamReader.start();
         LOGGER.info("starting patient event reader");
         patientStreamReader.start();
+        LOGGER.info("starting medical case event reader");
+        medicalCaseStreamReader.start();
         LOGGER.info("starting procedure event reader");
         procedureStreamReader.start();
 
@@ -147,6 +174,7 @@ public class Main {
                                     .setConfigItem(KafkaWriterConfig.KafkaWriterConfigItem.CLIENT_ID, "aki-service")
                                     .build())
                     .build());
+
             LOGGER.info("starting ampel result publisher");
             resultStreamPublisher.start();
 
