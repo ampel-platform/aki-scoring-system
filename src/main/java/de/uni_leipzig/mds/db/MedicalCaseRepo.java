@@ -27,6 +27,14 @@ public final class MedicalCaseRepo {
     public static MedicalCaseRepo initialize(MongoDatabase db) {
         requireNonNull(db, "database must not be null");
 
+        var medicalCaseCollection = RepoUtil.getCollection(db, MEDICAL_CASE_COLLECTION_NAME, MedicalCase.class)
+                .or(() -> createMedicalCaseCollection(db))
+                .orElseThrow(() -> new RuntimeException("cannot create medical case collection"));
+
+        return new MedicalCaseRepo(medicalCaseCollection);
+    }
+
+    private static Optional<MongoCollection<MedicalCase>> createMedicalCaseCollection(MongoDatabase db) {
         db.createCollection(MEDICAL_CASE_COLLECTION_NAME);
         var medCaseCollection = db.getCollection(MEDICAL_CASE_COLLECTION_NAME)
                 .withDocumentClass(MedicalCase.class)
@@ -39,7 +47,7 @@ public final class MedicalCaseRepo {
                 )
         ), uniquenessOpts);
 
-        return new MedicalCaseRepo(medCaseCollection);
+        return Optional.of(medCaseCollection);
     }
 
     Optional<MedicalCase> findById(String caseId) {
@@ -52,11 +60,6 @@ public final class MedicalCaseRepo {
     void upsertMedicalCase(MedicalCase medCase) {
         requireNonNull(medCase, "medical case must not be null");
 
-//        var medCaseUpdates = Updates.combine(
-//                Updates.set("patientIdRef", medCase.patientIdRef()),
-//                Updates.set("creationTime", medCase.creationTime()),
-//                Updates.set("cancellationTime", medCase.cancellationTime())
-//        );
         var filter = Filters.eq("caseId", medCase.id());
         var replaceOpts = new FindOneAndReplaceOptions()
                 .upsert(true);

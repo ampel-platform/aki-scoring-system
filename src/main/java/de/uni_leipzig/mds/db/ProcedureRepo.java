@@ -5,15 +5,18 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.TimeSeriesOptions;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.StreamSupport;
 
-import static com.mongodb.WriteConcern.ACKNOWLEDGED;
 import static java.util.Objects.requireNonNull;
 
 public final class ProcedureRepo {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProcedureRepo.class);
 
     private static final String PROCEDURE_COLLECTION_NAME = "procedure";
     private static final int ENTRY_EXPIRATION_IN_DAYS = 8;
@@ -27,6 +30,15 @@ public final class ProcedureRepo {
     public static ProcedureRepo initialize(MongoDatabase db) {
         requireNonNull(db, "database must not be null");
 
+        var procedureCollection = RepoUtil.getCollection(db, PROCEDURE_COLLECTION_NAME, Procedure.class)
+                .or(() -> createProcedureCollection(db))
+                .orElseThrow(() -> new RuntimeException("cannot create procedure collection"));
+
+        LOGGER.info("initialized procedure repo");
+        return new ProcedureRepo(procedureCollection);
+    }
+
+    private static Optional<MongoCollection<Procedure>> createProcedureCollection(MongoDatabase db) {
         var timeSeriesOpts = new TimeSeriesOptions("conductTime")
                 .metaField("caseId");
 
@@ -35,9 +47,7 @@ public final class ProcedureRepo {
                 .expireAfter(ENTRY_EXPIRATION_IN_DAYS, TimeUnit.DAYS);
 
         db.createCollection(PROCEDURE_COLLECTION_NAME, timeSeriesCollectionOpts);
-        return new ProcedureRepo(db.getCollection(PROCEDURE_COLLECTION_NAME)
-                .withDocumentClass(Procedure.class)
-                .withWriteConcern(ACKNOWLEDGED));
+        return RepoUtil.getCollection(db, PROCEDURE_COLLECTION_NAME, Procedure.class);
     }
 
     List<Procedure> findAllByCase(String caseId) {

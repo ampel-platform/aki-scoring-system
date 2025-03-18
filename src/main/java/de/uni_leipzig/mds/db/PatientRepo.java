@@ -8,6 +8,8 @@ import com.mongodb.client.model.IndexOptions;
 import org.bson.BsonDocument;
 import org.bson.BsonElement;
 import org.bson.BsonInt32;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.List;
 import java.util.Optional;
@@ -17,6 +19,7 @@ import static de.uni_leipzig.mds.util.PreconditionChecks.neitherNullNorBlank;
 import static java.util.Objects.requireNonNull;
 
 public class PatientRepo {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ProcedureRepo.class);
 
     private static final String PATIENT_COLLECTION_NAME = "patient";
 
@@ -29,6 +32,15 @@ public class PatientRepo {
     public static PatientRepo initialize(MongoDatabase db) {
         requireNonNull(db, "database must not be null");
 
+        var patientCollection = RepoUtil.getCollection(db, PATIENT_COLLECTION_NAME, Patient.class)
+                .or(() -> createPatientCollection(db))
+                .orElseThrow(() -> new RuntimeException("cannot create patient collection"));
+
+        LOGGER.info("initialized patient repo");
+        return new PatientRepo(patientCollection);
+    }
+
+    private static Optional<MongoCollection<Patient>> createPatientCollection(MongoDatabase db) {
         db.createCollection(PATIENT_COLLECTION_NAME);
         var patientCollection = db.getCollection(PATIENT_COLLECTION_NAME)
                 .withDocumentClass(Patient.class)
@@ -41,7 +53,7 @@ public class PatientRepo {
                 )
         ), uniquenessOpts);
 
-        return new PatientRepo(patientCollection);
+        return Optional.of(patientCollection);
     }
 
     Optional<Patient> findById(String patientId) {
@@ -55,11 +67,6 @@ public class PatientRepo {
     void upsertPatient(Patient patient) {
         requireNonNull(patient, "patient must not be null");
 
-//        var patientUpdates = Updates.combine(
-//                Updates.set("dateOfBirth", patient.dateOfBirth()),
-//                Updates.set("deceased", patient.deceased()),
-//                Updates.set("dischargeTime", patient.dischargeTime())
-//        );
         var filter = Filters.eq("patientId", patient.id());
         var replaceOpts = new FindOneAndReplaceOptions()
                 .upsert(true);
