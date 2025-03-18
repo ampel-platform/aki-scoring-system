@@ -4,12 +4,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.FindOneAndReplaceOptions;
-import com.mongodb.client.model.IndexOptions;
-import org.bson.BsonDocument;
-import org.bson.BsonElement;
-import org.bson.BsonInt32;
 
-import java.util.List;
 import java.util.Optional;
 
 import static com.mongodb.WriteConcern.ACKNOWLEDGED;
@@ -36,31 +31,24 @@ public final class MedicalCaseRepo {
 
     private static Optional<MongoCollection<MedicalCase>> createMedicalCaseCollection(MongoDatabase db) {
         db.createCollection(MEDICAL_CASE_COLLECTION_NAME);
-        var medCaseCollection = db.getCollection(MEDICAL_CASE_COLLECTION_NAME)
-                .withDocumentClass(MedicalCase.class)
-                .withWriteConcern(ACKNOWLEDGED);
 
-        var uniquenessOpts = new IndexOptions().unique(true);
-        medCaseCollection.createIndex(new BsonDocument(
-                List.of(
-                        new BsonElement("caseId", new BsonInt32(1))
-                )
-        ), uniquenessOpts);
-
-        return Optional.of(medCaseCollection);
+        return Optional.of(
+                db.getCollection(MEDICAL_CASE_COLLECTION_NAME)
+                        .withDocumentClass(MedicalCase.class)
+                        .withWriteConcern(ACKNOWLEDGED));
     }
 
     Optional<MedicalCase> findById(String caseId) {
         requireNonNull(caseId, "case id must not be null");
         return Optional.ofNullable(
-                collection.find(Filters.eq("caseId", caseId))
+                collection.find(Filters.eq("_id", caseId))
                         .first());
     }
 
     void upsertMedicalCase(MedicalCase medCase) {
         requireNonNull(medCase, "medical case must not be null");
 
-        var filter = Filters.eq("caseId", medCase.id());
+        var filter = Filters.eq("_id", medCase.id());
         var replaceOpts = new FindOneAndReplaceOptions()
                 .upsert(true);
 
