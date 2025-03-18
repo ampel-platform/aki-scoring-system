@@ -4,11 +4,7 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.IndexOptions;
 import com.mongodb.client.model.TimeSeriesOptions;
-import org.bson.BsonDocument;
-import org.bson.BsonElement;
-import org.bson.BsonInt32;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -42,15 +38,6 @@ public final class LabValueRepo {
         var labValueCollection = db.getCollection(LABORATORY_COLLECTION_NAME)
                 .withDocumentClass(LabValue.class)
                 .withWriteConcern(ACKNOWLEDGED);
-
-        var uniquenessOpts = new IndexOptions().unique(true);
-        labValueCollection.createIndex(new BsonDocument(
-                List.of(
-                        new BsonElement("caseId", new BsonInt32(1)),
-                        new BsonElement("orderId", new BsonInt32(1)),
-                        new BsonElement("analyte", new BsonInt32(1))
-                )
-        ), uniquenessOpts);
 
         return new LabValueRepo(labValueCollection);
     }
