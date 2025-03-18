@@ -38,7 +38,7 @@
         <dependency>
             <groupId>de.uni_leipzig.ampel</groupId>
             <artifactId>ampel-framework</artifactId>
-            <version>0.2.0-rc1</version>
+            <version>0.2.0-rc2</version>
         </dependency>
 
         <dependency>
