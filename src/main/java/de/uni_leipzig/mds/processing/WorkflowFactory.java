@@ -3,17 +3,15 @@ package de.uni_leipzig.mds.processing;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.protobuf.InvalidProtocolBufferException;
-import com.google.protobuf.Struct;
-import com.google.protobuf.util.JsonFormat;
-import de.uni_leipzig.mds.common.types.proto.TypeUtil;
-import de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelEventProtoBuf;
-import de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelStatus;
-import de.uni_leipzig.mds.evaluation.workflow.Step;
-import de.uni_leipzig.mds.evaluation.workflow.Transition;
-import de.uni_leipzig.mds.evaluation.workflow.Workflow;
-import de.uni_leipzig.mds.evaluation.workflow.task.Runner;
-import de.uni_leipzig.mds.io.message.Message;
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.Step;
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.Transition;
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.Workflow;
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.task.Runner;
+import de.uni_leipzig.ampel.sdk.io.message.Message;
+import de.uni_leipzig.ampel.sdk.io.message.result.ResultAmpelStatus;
+import de.uni_leipzig.ampel.sdk.io.message.result.ResultMessage;
 import de.uni_leipzig.mds.processing.context.WorkflowLabValue;
 import de.uni_leipzig.mds.processing.context.WorkflowMedicalCase;
 import io.vavr.control.Either;
@@ -260,26 +258,22 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.GREEN)
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.GREEN)
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -294,30 +288,26 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.GREEN)
-                                                        .setSeverity("AKIN Dialy")
-                                                        .setSeverityComment("Nach KDIGO-Kriterien liegt eine akute " +
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.GREEN)
+                                                        .severityRepresentation("AKIN Dialy")
+                                                        .severityComment("Nach KDIGO-Kriterien liegt eine akute " +
                                                                 "Nierenschädigung vor. Auf Grund einer dokumentierten Dialyse " +
                                                                 "innerhalb der letzten 7 Tage wurde der AKI-Alarm deaktiviert.")
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -332,31 +322,27 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.YELLOW)
-                                                        .setSeverity("AKIN1")
-                                                        .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.YELLOW)
+                                                        .severityRepresentation("AKIN1")
+                                                        .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung hin (AKIN-Stadium 1 nach KDIGO-Kriterien). " +
                                                                 "Weiterführende Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) " +
                                                                 "empfohlen.")
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -371,31 +357,27 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.YELLOW)
-                                                        .setSeverity("AKIN2")
-                                                        .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.YELLOW)
+                                                        .severityRepresentation("AKIN2")
+                                                        .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung hin (AKIN-Stadium 2 nach KDIGO-Kriterien). " +
                                                                 "Weiterführende Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) " +
                                                                 "und ggf. nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -410,31 +392,27 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.YELLOW)
-                                                        .setSeverity("AKIN3")
-                                                        .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.YELLOW)
+                                                        .severityRepresentation("AKIN3")
+                                                        .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung hin (AKIN-Stadium 3 nach KDIGO-Kriterien). " +
                                                                 "Weiterführende Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) " +
                                                                 "und nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -449,31 +427,27 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.RED)
-                                                        .setSeverity("AKIN1")
-                                                        .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.RED)
+                                                        .severityRepresentation("AKIN1")
+                                                        .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung im Zusammenhang mit einer Vancomycintherpie hin" +
                                                                 " (AKIN-Stadium 1 nach KDIGO-Kriterien). Weiterführende " +
                                                                 "Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) empfohlen.")
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -488,32 +462,28 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.RED)
-                                                        .setSeverity("AKIN2")
-                                                        .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.RED)
+                                                        .severityRepresentation("AKIN2")
+                                                        .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung im Zusammenhang mit einer Vancomycintherapie " +
                                                                 "hin (AKIN-Stadium 2 nach KDIGO-Kriterien). Weiterführende " +
                                                                 "Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) und ggf. " +
                                                                 "nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -528,32 +498,28 @@ public class WorkflowFactory {
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
                             try {
-                                ctx.emitAmpelEvent(
+                                ctx.emitScoringSystemResult(
                                         new Message<>(
                                                 medicalCase.caseId(),
                                                 null,
-                                                AmpelEventProtoBuf.newBuilder()
-                                                        .setRuleName("AKI")
-                                                        .setRuleVersion("v0.1.0")
-                                                        .setPatientId(medicalCase.patient().id())
-                                                        .setPatientCaseId(medicalCase.caseId())
-                                                        .setStatus(AmpelStatus.RED)
-                                                        .setSeverity("AKIN3")
-                                                        .setSeverityComment("Der Kreatininanstieg weist auf eine akute " +
+                                                ResultMessage.builder()
+                                                        .scoringSystemName("AKI")
+                                                        .scoringSystemVersion("v0.1.0")
+                                                        .patientId(medicalCase.patient().id())
+                                                        .medicalCaseId(medicalCase.caseId())
+                                                        .resultStatus(ResultAmpelStatus.RED)
+                                                        .severityRepresentation("AKIN3")
+                                                        .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung im Zusammenhang mit einer Vancomycintherapie " +
                                                                 "hin (AKIN-Stadium 3 nach KDIGO-Kriterien). Weiterführende " +
                                                                 "Diagnostik- und Therapiemaßnahmen (KDIGO-Bundle) und " +
                                                                 "nephrologisches Konsil empfohlen.")
-                                                        .setAnalyteName(triggerValue.analyte())
-                                                        .setAnalyteValue(String.valueOf(triggerValue.analyteValue()))
-                                                        .setAnalyteValueUnit(triggerValue.analyteUnit())
-                                                        .setAnalyteMeasurementDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                triggerValue.measuringTime(), ZoneOffset.UTC
-                                                        ))
-                                                        .setResultCreationDateTime(TypeUtil.toProtoBufTimestamp(
-                                                                LocalDateTime.now(ZoneOffset.UTC), ZoneOffset.UTC
-                                                        ))
-                                                        .setMeta(createSummaryInfoStruct(summaryBuilder.build()))
+                                                        .analyteName(triggerValue.analyte())
+                                                        .analyteValue(String.valueOf(triggerValue.analyteValue()))
+                                                        .analyteValueUnit(triggerValue.analyteUnit())
+                                                        .analyteMeasuringTime(triggerValue.measuringTime())
+                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
@@ -659,15 +625,15 @@ public class WorkflowFactory {
                 .build();
     }
 
-    private static Struct createSummaryInfoStruct(Summary summary) throws JsonProcessingException,
+    private static ObjectNode createSummaryInfoStruct(Summary summary) throws JsonProcessingException,
             InvalidProtocolBufferException {
         var mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
 
-        var summaryJson = mapper.writeValueAsString(summary);
-        var structBuilder = Struct.newBuilder();
-        JsonFormat.parser().ignoringUnknownFields().merge(summaryJson, structBuilder);
-        return structBuilder.build();
+
+        var obj = mapper.createObjectNode();
+        obj.putPOJO("workflowSummary", summary);
+        return obj;
     }
 
     @Data

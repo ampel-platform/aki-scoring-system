@@ -15,7 +15,7 @@ import java.util.stream.StreamSupport;
 
 import static java.util.Objects.requireNonNull;
 
-public final class ProcedureRepo {
+public final class ProcedureRepo implements IProcedureRepo {
     private static final Logger LOGGER = LoggerFactory.getLogger(ProcedureRepo.class);
 
     private static final String PROCEDURE_COLLECTION_NAME = "procedure";
@@ -49,16 +49,19 @@ public final class ProcedureRepo {
         db.createCollection(PROCEDURE_COLLECTION_NAME, timeSeriesCollectionOpts);
         return RepoUtil.getCollection(db, PROCEDURE_COLLECTION_NAME, Procedure.class);
     }
+    
 
-    List<Procedure> findAllByCase(String caseId) {
+    @Override
+    public void insertProcedure(Procedure procedure) {
+        requireNonNull(procedure, "procedure must not be null");
+        collection.insertOne(procedure);
+    }
+
+    @Override
+    public List<Procedure> findProceduresInCase(String caseId) {
         requireNonNull(caseId, "case id must not be null");
 
         var procedures = collection.find(Filters.eq("caseId", caseId));
         return StreamSupport.stream(procedures.spliterator(), false).toList();
-    }
-
-    void insert(Procedure procedure) {
-        requireNonNull(procedure, "procedure must not be null");
-        collection.insertOne(procedure);
     }
 }
