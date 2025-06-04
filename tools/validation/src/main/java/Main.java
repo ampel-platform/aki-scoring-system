@@ -10,16 +10,18 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.time.LocalDateTime;
 
+import static java.lang.System.getenv;
 import static java.time.temporal.ChronoUnit.SECONDS;
+import static java.util.Objects.requireNonNull;
 
 public class Main {
 
     public static void main(String[] args) throws IOException {
-        var patientDataSource = System.getenv("PATIENT_DATA_SOURCE");
-        var medCaseDataSource = System.getenv("MED_CASE_DATA_SOURCE");
-        var procedureDataSource = System.getenv("PROCEDURE_DATA_SOURCE");
-        var labDataSource = System.getenv("LABORATORY_DATA_SOURCE");
-        var expectedResultsSource = System.getenv("EXPECTED_RESULTS_SOURCE");
+        var patientDataSource = requireNonNull(getenv("PATIENT_DATA_SOURCE"));
+        var medCaseDataSource = requireNonNull(getenv("MED_CASE_DATA_SOURCE"));
+        var procedureDataSource = requireNonNull(getenv("PROCEDURE_DATA_SOURCE"));
+        var labDataSource = requireNonNull(getenv("LABORATORY_DATA_SOURCE"));
+        var expectedResultsSource = requireNonNull(getenv("EXPECTED_RESULTS_SOURCE"));
 
         var referenceTimestamp = LocalDateTime.now();
 
