@@ -3,13 +3,17 @@ package csv.patient;
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvDate;
-import lombok.Getter;
+import csv.TimeAdjustable;
+import lombok.*;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Getter
-public final class PatientData {
+@NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
+public final class PatientData implements TimeAdjustable<PatientData> {
 
     @CsvBindByName(column = "patientId")
     private String id;
@@ -39,6 +43,20 @@ public final class PatientData {
     @CsvBindByName(column = "updateDate")
     @CsvDate(value = "yyyy-MM-dd")
     private LocalDate updateDate;
+
+    @Override
+    public PatientData offsetTimesBySeconds(long offsetSeconds) {
+        return PatientData.builder()
+                .id(id)
+                .sex(sex)
+                .dateOfBirth(dateOfBirth.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
+                .deceased(deceased)
+                .dischargeTimestamp(dischargeTimestamp.plusSeconds(offsetSeconds))
+                .cancellationDate(cancellationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
+                .creationDate(creationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
+                .updateDate(updateDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
+                .build();
+    }
 
     public String toString() {
         return "ID: %s | Sex: %s | DOB: %s | Deceased: %s | Discharge Time: %s | Cancellation Date: %s | Creation Date: %s | Update Date: %s"

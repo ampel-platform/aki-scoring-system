@@ -3,12 +3,16 @@ package csv.medcase;
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvDate;
-import lombok.Getter;
+import csv.TimeAdjustable;
+import lombok.*;
 
 import java.time.LocalDate;
 
 @Getter
-public final class MedicalCaseData {
+@NoArgsConstructor
+@AllArgsConstructor(access = AccessLevel.PRIVATE)
+@Builder
+public final class MedicalCaseData implements TimeAdjustable<MedicalCaseData> {
 
     @CsvBindByName(column = "caseId")
     private String id;
@@ -30,6 +34,18 @@ public final class MedicalCaseData {
     @CsvBindByName(column = "updateDate")
     @CsvDate(value = "yyyy-MM-dd")
     private LocalDate updateDate;
+
+    @Override
+    public MedicalCaseData offsetTimesBySeconds(long offsetSeconds) {
+        return MedicalCaseData.builder()
+                .id(id)
+                .patientId(patientId)
+                .status(status)
+                .creationDate(creationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
+                .cancellationDate(cancellationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
+                .updateDate(updateDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
+                .build();
+    }
 
     public String toString() {
         return "ID: %s | Patient ID: %s | Status: %s | Creation Date: %s | Cancellation Date: %s | Update Date: %s"
