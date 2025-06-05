@@ -8,22 +8,15 @@ import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.function.Predicate;
 
-import static java.time.temporal.ChronoUnit.DAYS;
 import static java.util.Objects.requireNonNull;
 
 // TODO: docs
 public final class ProcedureMessageHandler implements MessageHandler<ProcedureMessage> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ProcedureMessageHandler.class);
-
-    /**
-     * Denotes the maximum allowed age of a procedure message in days.
-     */
-    private static final int MAX_PROCEDURE_MESSAGE_AGE_IN_DAYS = 7;
 
     /**
      * Codes that denote a dialysis procedure.
@@ -42,10 +35,7 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
 
         var procedureMessagePayload = message.body();
 
-        var messageFilterCriterion = isConsiderableProcedure()
-                .and(Predicate.not(isExceedingMaxAllowedAge()));
-
-        if (!messageFilterCriterion.test(procedureMessagePayload)) {
+        if (!isConsiderableProcedure().test(procedureMessagePayload)) {
             LOGGER.warn("procedure message `{}` won't get handled since it was filtered out",
                     procedureMessagePayload.procedureId());
             return;
@@ -71,19 +61,6 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
                 LOGGER.warn("procedure message `{}` is not a dialysis procedure", message.procedureId());
             }
             return isDialysis;
-        };
-    }
-
-    private Predicate<ProcedureMessage> isExceedingMaxAllowedAge() {
-        return (message) -> {
-            var ageInDays = Math.abs(message.performedOn().until(LocalDateTime.now(), DAYS));
-            var exceedsMaximumAge = ageInDays > MAX_PROCEDURE_MESSAGE_AGE_IN_DAYS;
-
-            if (exceedsMaximumAge) {
-                LOGGER.warn("procedure message `{}` exceeds maximum allowed age of `{}` days", message.procedureId(),
-                        MAX_PROCEDURE_MESSAGE_AGE_IN_DAYS);
-            }
-            return exceedsMaximumAge;
         };
     }
 }

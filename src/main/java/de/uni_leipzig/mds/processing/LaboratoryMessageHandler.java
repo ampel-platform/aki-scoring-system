@@ -22,17 +22,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.function.Predicate;
 
 import static de.uni_leipzig.mds.processing.WorkflowFactory.MEDICAL_CASE_PARAM;
-import static java.time.temporal.ChronoUnit.DAYS;
 import static java.util.Objects.requireNonNull;
 
 public final class LaboratoryMessageHandler implements MessageHandler<LaboratoryMessage> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LaboratoryMessageHandler.class);
-
-    /**
-     * Denotes the maximum allowed age of a laboratory message in days.
-     */
-    private static final int MAX_LABORATORY_MESSAGE_AGE_IN_DAYS = 7;
 
     /**
      * Codes that denote a creatinine value.
@@ -58,10 +52,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         LOGGER.debug("received laboratory message");
         var labMessagePayload = message.body();
 
-        var messageFilterCriterion = isConsiderableLaboratoryValue()
-                .and(Predicate.not(isExceedingMaxAllowedAge()));
-
-        if (!messageFilterCriterion.test(labMessagePayload)) {
+        if (!isConsiderableLaboratoryValue().test(labMessagePayload)) {
             LOGGER.warn("laboratory message `{}` won't get handled since it was filtered out",
                     labMessagePayload.documentId());
             return;
@@ -108,19 +99,6 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
 
     private Predicate<LaboratoryMessage> isResemblingVancomycinValue() {
         return (message) -> LAB_CODES_VANCOMYCIN.contains(message.analyte().toUpperCase());
-    }
-
-    private Predicate<LaboratoryMessage> isExceedingMaxAllowedAge() {
-        return (message) -> {
-            var ageInDays = Math.abs(message.analyteMeasuringTimestamp().until(LocalDateTime.now(), DAYS));
-            var exceedsMaximumAge = ageInDays > MAX_LABORATORY_MESSAGE_AGE_IN_DAYS;
-
-            if (exceedsMaximumAge) {
-                LOGGER.warn("laboratory message `{}` exceeds maximum allowed age of `{}` days",
-                        message.documentId(), MAX_LABORATORY_MESSAGE_AGE_IN_DAYS);
-            }
-            return exceedsMaximumAge;
-        };
     }
 
     private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId, String orderId) {
