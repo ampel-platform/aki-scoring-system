@@ -5,8 +5,8 @@ import de.uni_leipzig.ampel.sdk.evaluation.workflow.PatientMedicalCaseIdentifier
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowPipeline;
 import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
-import de.uni_leipzig.mds.db.IAkiRepo;
-import de.uni_leipzig.mds.db.LabValue;
+import de.uni_leipzig.mds.db.AkiRepo;
+import de.uni_leipzig.mds.db.types.LaboratoryEntry;
 import de.uni_leipzig.mds.processing.context.WorkflowLabValue;
 import de.uni_leipzig.mds.processing.context.WorkflowMedicalCase;
 import de.uni_leipzig.mds.processing.context.WorkflowPatient;
@@ -44,10 +44,10 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
      */
     private static final List<String> LAB_CODES_VANCOMYCIN = List.of("VANC-K_S", "VANC-S_S", "VANC-T_S", "VANC-U_S");
 
-    private final IAkiRepo akiRepo;
+    private final AkiRepo akiRepo;
     private final BlockingQueue<WorkflowPipeline.WorkflowPipelineInput> workflowInputChannel;
 
-    public LaboratoryMessageHandler(IAkiRepo akiRepo,
+    public LaboratoryMessageHandler(AkiRepo akiRepo,
                                     BlockingQueue<WorkflowPipeline.WorkflowPipelineInput> workflowInputChannel) {
         this.akiRepo = requireNonNull(akiRepo, "aki repository must not be null");
         this.workflowInputChannel = requireNonNull(workflowInputChannel, "workflow message channel must not be null");
@@ -68,8 +68,8 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         }
 
         LOGGER.debug("inserting laboratory value with id `{}`", labMessagePayload.documentId());
-        akiRepo.insertLabValue(
-                new LabValue(
+        akiRepo.insertLaboratoryEntry(
+                new LaboratoryEntry(
                         ObjectId.get(),
                         labMessagePayload.caseId(),
                         labMessagePayload.orderId(),
@@ -124,17 +124,17 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
     }
 
     private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId, String orderId) {
-        var medicalCase = akiRepo.findMedicalCase(caseId).orElse(null);
+        var medicalCase = akiRepo.findMedicalCaseById(caseId).orElse(null);
         if (medicalCase == null) {
             LOGGER.warn("no associated medical case for laboratory order '{}'", orderId);
             return Optional.empty();
         }
-        var patient = akiRepo.findPatientInCase(caseId).orElse(null);
+        var patient = akiRepo.findPatientById(medicalCase.patientIdRef()).orElse(null);
         if (patient == null) {
             LOGGER.warn("no associated patient for laboratory order '{}'", orderId);
             return Optional.empty();
         }
-        var labValues = akiRepo.findLabValuesInCase(caseId)
+        var labValues = akiRepo.findAllLaboratoryEntriesInMedicalCase(caseId)
                 .stream().map(lv -> new WorkflowLabValue(
                         lv.orderId(),
                         lv.analyte(),
@@ -152,7 +152,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
                         lv -> LAB_CODES_VANCOMYCIN.contains(lv.analyte().toUpperCase()))
                 .toList();
 
-        var procedures = akiRepo.findProceduresInCase(caseId)
+        var procedures = akiRepo.findAllProceduresInMedicalCase(caseId)
                 .stream().map(proc -> new WorkflowProcedure(
                         proc.procedureId(),
                         proc.procedureCode(),

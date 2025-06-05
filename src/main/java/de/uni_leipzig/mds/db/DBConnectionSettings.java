@@ -40,6 +40,6 @@ public final class DBConnectionSettings {
      * @return The connection string.
      */
     public ConnectionString getConnectionString() {
-        return new ConnectionString("mongodb://%s:%s".formatted(host, port));
+        return new ConnectionString("mongodb://%s:%s/%s".formatted(host, port, dbName));
     }
 }

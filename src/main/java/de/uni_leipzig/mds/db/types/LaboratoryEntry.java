@@ -1,11 +1,11 @@
-package de.uni_leipzig.mds.db;
+package de.uni_leipzig.mds.db.types;
 
 import org.bson.codecs.pojo.annotations.BsonId;
 import org.bson.types.ObjectId;
 
 import java.time.LocalDateTime;
 
-public record LabValue(
+public record LaboratoryEntry(
         @BsonId
         ObjectId id,
         String caseId,
