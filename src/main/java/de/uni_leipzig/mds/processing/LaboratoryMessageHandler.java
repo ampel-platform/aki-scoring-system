@@ -1,8 +1,8 @@
 package de.uni_leipzig.mds.processing;
 
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.Context;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Parameter;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.PatientMedicalCaseIdentifier;
-import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowPipeline;
 import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
 import de.uni_leipzig.mds.db.AkiRepo;
@@ -39,12 +39,15 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
     private static final List<String> LAB_CODES_VANCOMYCIN = List.of("VANC-K_S", "VANC-S_S", "VANC-T_S", "VANC-U_S");
 
     private final AkiRepo akiRepo;
-    private final BlockingQueue<WorkflowPipeline.WorkflowPipelineInput> workflowInputChannel;
+    private final BlockingQueue<WorkflowTrigger> workflowTriggerQueue;
+    private final WorkflowCleaner workflowCleaner;
 
     public LaboratoryMessageHandler(AkiRepo akiRepo,
-                                    BlockingQueue<WorkflowPipeline.WorkflowPipelineInput> workflowInputChannel) {
+                                    BlockingQueue<WorkflowTrigger> workflowTriggerQueue,
+                                    WorkflowCleaner workflowCleaner) {
         this.akiRepo = requireNonNull(akiRepo, "aki repository must not be null");
-        this.workflowInputChannel = requireNonNull(workflowInputChannel, "workflow message channel must not be null");
+        this.workflowTriggerQueue = requireNonNull(workflowTriggerQueue, "workflow trigger queue must not be null");
+        this.workflowCleaner = requireNonNull(workflowCleaner, "workflow cleaner must not be null");
     }
 
     @Override
@@ -72,7 +75,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
 
         if (isResemblingCreatinineValue().test(labMessagePayload)) {
             LOGGER.info("triggering workflow execution");
-            triggerWorkflowRun(labMessagePayload.caseId(),
+            triggerWorkflowRunWithCleanup(labMessagePayload.caseId(),
                     labMessagePayload.orderId(),
                     labMessagePayload.analyteMeasuringTimestamp().minusDays(7),
                     labMessagePayload.analyteMeasuringTimestamp());
@@ -154,9 +157,9 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         ));
     }
 
-    private void triggerWorkflowRun(String medicalCaseId, String orderId,
+    private void triggerWorkflowRunWithCleanup(String medicalCaseId, String orderId,
                                     LocalDateTime oldestConsideredDateTime,
-                                    LocalDateTime latestConsideredDateTime) {
+                                               LocalDateTime latestConsideredDateTime) {
         generateMedicalCaseForWorkflowRun(medicalCaseId, orderId)
                 .map(mc -> mc.filterForValuesBetween(
                         oldestConsideredDateTime,
@@ -171,10 +174,18 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
                             var workflowInputParams = new Parameter()
                                     .set(MEDICAL_CASE_PARAM, workflowMedicalCase);
 
+                            var workflowContext = new Context();
+                            workflowContext.registerScoringSystemResultListener(
+                                    msg -> workflowCleaner
+                                            .expireEntriesInMedicalCaseOlderThan(medicalCaseId,
+                                                    oldestConsideredDateTime));
+
                             LOGGER.info("triggering aki workflow due to registered creatinine value");
-                            workflowInputChannel.add(new WorkflowPipeline.WorkflowPipelineInput(
+                            workflowTriggerQueue.add(new WorkflowTrigger(
                                     new PatientMedicalCaseIdentifier(workflowMedicalCase.patient().id(),
-                                            workflowMedicalCase.caseId()), workflowInputParams));
+                                            workflowMedicalCase.caseId())
+                                    , workflowContext
+                                    , workflowInputParams));
                         },
                         () -> LOGGER.warn("skipping workflow run for order '{}' despite having registered a " +
                                 "creatinine value because other information required by the workflow is " +

@@ -9,6 +9,7 @@ import de.uni_leipzig.mds.db.types.MedicalCase;
 import de.uni_leipzig.mds.db.types.Patient;
 import de.uni_leipzig.mds.db.types.Procedure;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -56,6 +57,21 @@ public final class AkiRepoImpl implements AkiRepo {
             throw new RuntimeException("could not find inserted laboratory entry with id '%s'"
                     .formatted(res.getInsertedId()));
         }
+    }
+
+    @Override
+    public long deleteLaboratoryEntriesInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t) {
+        neitherNullNorBlank(medicalCaseId, "medical case ID must neither be null nor blank");
+        requireNonNull(t, "timestamp must not be null");
+
+        var res = laboratoryCollection.deleteMany(
+                Filters.and(
+                        Filters.eq("caseId", medicalCaseId),
+                        Filters.eq("measuringTime", t)
+                )
+        );
+
+        return res.getDeletedCount();
     }
 
     @Override
@@ -124,5 +140,20 @@ public final class AkiRepoImpl implements AkiRepo {
             throw new RuntimeException("could not find inserted procedure with id '%s'"
                     .formatted(res.getInsertedId()));
         }
+    }
+
+    @Override
+    public long deleteProceduresInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t) {
+        neitherNullNorBlank(medicalCaseId, "medical case ID must neither be null nor blank");
+        requireNonNull(t, "timestamp must not be null");
+
+        var res = procedureCollection.deleteMany(
+                Filters.and(
+                        Filters.eq("caseId", medicalCaseId),
+                        Filters.gt("conductTime", t)
+                )
+        );
+
+        return res.getDeletedCount();
     }
 }

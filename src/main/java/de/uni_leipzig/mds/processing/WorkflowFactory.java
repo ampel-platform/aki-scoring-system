@@ -30,7 +30,7 @@ import java.util.Optional;
 /**
  * Factory for creating a {@link Workflow} that can run an evaluation for acute kidney injury (AKI).
  */
-public class WorkflowFactory {
+public final class WorkflowFactory {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(WorkflowFactory.class);
 

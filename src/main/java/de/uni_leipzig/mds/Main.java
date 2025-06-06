@@ -1,6 +1,5 @@
 package de.uni_leipzig.mds;
 
-import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowPipeline;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowScheduler;
 import de.uni_leipzig.ampel.sdk.io.kafka.*;
 import de.uni_leipzig.ampel.sdk.io.message.Message;
@@ -9,7 +8,8 @@ import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
 import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
 import de.uni_leipzig.ampel.sdk.io.message.result.ResultMessage;
-import de.uni_leipzig.mds.db.*;
+import de.uni_leipzig.mds.db.DBConnectionSettings;
+import de.uni_leipzig.mds.db.RepositoryFactory;
 import de.uni_leipzig.mds.processing.*;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -33,7 +33,16 @@ public class Main {
         var kafkaConsumerCommitTimeoutMs = requireNonNull(getenv("KAFKA_CONSUMER_COMMIT_TIMEOUT_MS"), "Kafka consumer commit " +
                 "timeout in ms must be specified");
 
-        //var incomingMessages = new LinkedBlockingQueue<Tuple2<KafkaTopics, Message<String, ?>>>();
+        var workflowTriggerQueue = new LinkedBlockingQueue<WorkflowTrigger>();
+        var workflowResultQueue = new LinkedBlockingQueue<Message<String, ResultMessage>>();
+        var workflowManager = new Thread(new WorkflowManager(
+                workflowTriggerQueue,
+                workflowResultQueue,
+                WorkflowFactory.createAkiWorkflow(),
+                WorkflowScheduler.createVirtualWorkflowScheduler()
+        ));
+
+
         var sharedTopicReaderConfig = KafkaReaderConfig.builder()
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, kafkaConsumerGroupId)
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.ENABLE_AUTO_COMMIT, false)
@@ -41,71 +50,53 @@ public class Main {
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
                 .build();
 
+
         var dbConnSettings = new DBConnectionSettings(mongoDBHost, mongoDBPort, mongoDBName);
-        try (var dbClient = ClientFactory.createDBClient(dbConnSettings.getConnectionString())) {
-            var db = dbClient.getDatabase(dbConnSettings.getDbName());
-            var akiRepo = new AkiRepo(
-                    ProcedureRepo.initialize(db),
-                    LabValueRepo.initialize(db),
-                    MedicalCaseRepo.initialize(db),
-                    PatientRepo.initialize(db)
-            );
+        var akiRepo = RepositoryFactory.getInitializedAkiRepo(dbConnSettings.getConnectionString());
+        var workflowCleaner = new WorkflowCleaner(akiRepo);
 
-            var akiWorkflow = WorkflowFactory.createAkiWorkflow();
-            var akiWorkflowScheduler = WorkflowScheduler.createVirtualWorkflowScheduler();
+        var labMessageHandler = new LaboratoryMessageHandler(akiRepo, workflowTriggerQueue, workflowCleaner);
+        var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, kafkaBootstrapServers, sharedTopicReaderConfig,
+                labMessageHandler, LaboratoryMessage.class);
 
-            var workflowPipelineInputQueue = new LinkedBlockingQueue<WorkflowPipeline.WorkflowPipelineInput>();
-            var workflowPipelineOutputQueue = new LinkedBlockingQueue<Message<String, ResultMessage>>();
+        var medicalCaseMessageHandler = new MedicalCaseMessageHandler(akiRepo);
+        var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, kafkaBootstrapServers,
+                sharedTopicReaderConfig, medicalCaseMessageHandler, MedCaseMessage.class);
 
-            var workflowScheduler = new Thread(WorkflowPipeline.builder()
-                    .withIOQueues(workflowPipelineInputQueue, workflowPipelineOutputQueue)
-                    .withScheduler(akiWorkflowScheduler)
-                    .withWorkflow(akiWorkflow)
-                    .build());
+        var patientMessageHandler = new PatientMessageHandler(akiRepo);
+        var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, kafkaBootstrapServers, sharedTopicReaderConfig,
+                patientMessageHandler, PatientMessage.class);
 
-            var labMessageHandler = new LaboratoryMessageHandler(akiRepo, workflowPipelineInputQueue);
-            var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, kafkaBootstrapServers, sharedTopicReaderConfig,
-                    labMessageHandler, LaboratoryMessage.class);
+        var procedureMessageHandler = new ProcedureMessageHandler(akiRepo);
+        var procedureTopicReader = getTopicReader(KafkaTopics.PROCEDURES, kafkaBootstrapServers,
+                sharedTopicReaderConfig, procedureMessageHandler, ProcedureMessage.class);
 
-            var medicalCaseMessageHandler = new MedicalCaseMessageHandler(akiRepo);
-            var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, kafkaBootstrapServers,
-                    sharedTopicReaderConfig, medicalCaseMessageHandler, MedCaseMessage.class);
+        var resultPublisher = KafkaWriter.<String, ResultMessage>builder()
+                .useBootstrapServers(kafkaBootstrapServers)
+                .useTopic(KafkaTopics.AMPEL_RESULT)
+                .withMessagePublishingChannel(workflowResultQueue)
+                .withSerializationStrategy(
+                        new KafkaSerializationStrategy<>(
+                                new StringSerializer(),
+                                KafkaSerde.createKafkaSerializer(ResultMessage.class)))
+                .withKafkaWriterConfig(
+                        KafkaWriterConfig.builder()
+                                .setConfigItem(KafkaWriterConfig.KafkaWriterConfigItem.CLIENT_ID, "aki-service")
+                                .build())
+                .build();
 
-            var patientMessageHandler = new PatientMessageHandler(akiRepo);
-            var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, kafkaBootstrapServers, sharedTopicReaderConfig,
-                    patientMessageHandler, PatientMessage.class);
-
-            var procedureMessageHandler = new ProcedureMessageHandler(akiRepo);
-            var procedureTopicReader = getTopicReader(KafkaTopics.PROCEDURES, kafkaBootstrapServers,
-                    sharedTopicReaderConfig, procedureMessageHandler, ProcedureMessage.class);
-
-            var resultPublisher = KafkaWriter.<String, ResultMessage>builder()
-                    .useBootstrapServers(kafkaBootstrapServers)
-                    .useTopic(KafkaTopics.AMPEL_RESULT)
-                    .withMessagePublishingChannel(workflowPipelineOutputQueue)
-                    .withSerializationStrategy(
-                            new KafkaSerializationStrategy<>(
-                                    new StringSerializer(),
-                                    KafkaSerde.createKafkaSerializer(ResultMessage.class)))
-                    .withKafkaWriterConfig(
-                            KafkaWriterConfig.builder()
-                                    .setConfigItem(KafkaWriterConfig.KafkaWriterConfigItem.CLIENT_ID, "aki-service")
-                                    .build())
-                    .build();
-
-            LOGGER.info("starting workflow scheduler");
-            workflowScheduler.start();
-            LOGGER.info("starting lab event reader");
-            labTopicReader.start();
-            LOGGER.info("starting patient event reader");
-            patientTopicReader.start();
-            LOGGER.info("starting medical case event reader");
-            medicalCaseTopicReader.start();
-            LOGGER.info("starting procedure event reader");
-            procedureTopicReader.start();
-            LOGGER.info("starting ampel result publisher");
-            resultPublisher.run();
-        }
+        LOGGER.info("starting workflow manager");
+        workflowManager.start();
+        LOGGER.info("starting lab event reader");
+        labTopicReader.start();
+        LOGGER.info("starting patient event reader");
+        patientTopicReader.start();
+        LOGGER.info("starting medical case event reader");
+        medicalCaseTopicReader.start();
+        LOGGER.info("starting procedure event reader");
+        procedureTopicReader.start();
+        LOGGER.info("starting ampel result publisher");
+        resultPublisher.run();
     }
 
     private static <T> Thread getTopicReader(KafkaTopics topic, String bootstrapServers, KafkaReaderConfig readerConfig,
