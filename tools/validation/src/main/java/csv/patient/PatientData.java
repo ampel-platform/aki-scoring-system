@@ -3,7 +3,6 @@ package csv.patient;
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvDate;
-import csv.TimeAdjustable;
 import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
 import de.uni_leipzig.ampel.sdk.io.message.patient.Sex;
 import lombok.*;
@@ -15,7 +14,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public final class PatientData implements TimeAdjustable<PatientData> {
+public final class PatientData {
 
     @CsvBindByName(column = "patientId")
     private String id;
@@ -45,20 +44,6 @@ public final class PatientData implements TimeAdjustable<PatientData> {
     @CsvBindByName(column = "updateDate")
     @CsvDate(value = "yyyy-MM-dd")
     private LocalDate updateDate;
-
-    @Override
-    public PatientData offsetTimesBySeconds(long offsetSeconds) {
-        return PatientData.builder()
-                .id(id)
-                .sex(sex)
-                .dateOfBirth(dateOfBirth.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
-                .deceased(deceased)
-                .dischargeTimestamp(dischargeTimestamp.plusSeconds(offsetSeconds))
-                .cancellationDate(cancellationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
-                .creationDate(creationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
-                .updateDate(updateDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
-                .build();
-    }
 
     public PatientMessage convertToPatientMessage() {
         return new PatientMessage(

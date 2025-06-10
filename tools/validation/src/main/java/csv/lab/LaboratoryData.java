@@ -3,7 +3,6 @@ package csv.lab;
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvDate;
-import csv.TimeAdjustable;
 import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
 import lombok.*;
 
@@ -13,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public final class LaboratoryData implements TimeAdjustable<LaboratoryData> {
+public final class LaboratoryData {
 
     @CsvBindByName(column = "documentId")
     private String documentId;
@@ -58,26 +57,6 @@ public final class LaboratoryData implements TimeAdjustable<LaboratoryData> {
     @CsvBindByName(column = "analyteMeasuringTimestamp")
     @CsvDate(value = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime measuredAt;
-
-    @Override
-    public LaboratoryData offsetTimesBySeconds(long offsetSeconds) {
-        return LaboratoryData.builder()
-                .documentId(documentId)
-                .documentVersion(documentVersion)
-                .documentPart(documentPart)
-                .sequenceId(sequenceId)
-                .medicalCaseId(medicalCaseId)
-                .patientId(patientId)
-                .orderId(orderId)
-                .createdAt(createdAt.plusSeconds(offsetSeconds)) // adjust
-                .originatingSystem(originatingSystem)
-                .analyte(analyte)
-                .analyteText(analyteText)
-                .analyteValue(analyteValue)
-                .analyteUnit(analyteUnit)
-                .measuredAt(measuredAt.plusSeconds(offsetSeconds)) // adjust
-                .build();
-    }
 
     public LaboratoryMessage convertToLaboratoryMessage() {
         return new LaboratoryMessage(

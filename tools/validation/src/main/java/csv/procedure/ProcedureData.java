@@ -2,7 +2,6 @@ package csv.procedure;
 
 import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvDate;
-import csv.TimeAdjustable;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
 import lombok.*;
 
@@ -13,7 +12,7 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
 @Builder
-public final class ProcedureData implements TimeAdjustable<ProcedureData> {
+public final class ProcedureData {
 
     @CsvBindByName(column = "procedureId")
     private String id;
@@ -35,18 +34,6 @@ public final class ProcedureData implements TimeAdjustable<ProcedureData> {
     @CsvBindByName(column = "updateDate")
     @CsvDate(value = "yyyy-MM-dd")
     private LocalDate updateDate;
-
-    @Override
-    public ProcedureData offsetTimesBySeconds(long offsetSeconds) {
-        return ProcedureData.builder()
-                .id(id)
-                .medicalCaseId(medicalCaseId)
-                .code(code)
-                .performedOn(performedOn.plusSeconds(offsetSeconds))
-                .cancellationDate(cancellationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
-                .updateDate(updateDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
-                .build();
-    }
 
     public ProcedureMessage convertToProcedureMessage() {
         return new ProcedureMessage(
