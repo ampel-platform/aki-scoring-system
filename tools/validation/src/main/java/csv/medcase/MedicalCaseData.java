@@ -4,6 +4,8 @@ import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvDate;
 import csv.TimeAdjustable;
+import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
+import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseStatus;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -45,6 +47,25 @@ public final class MedicalCaseData implements TimeAdjustable<MedicalCaseData> {
                 .cancellationDate(cancellationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
                 .updateDate(updateDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
                 .build();
+    }
+
+    public MedCaseMessage convertToMedicalCaseMessage() {
+        return new MedCaseMessage(
+                id,
+                patientId,
+                mapMedicalCaseStatus(),
+                creationDate,
+                cancellationDate,
+                updateDate
+        );
+    }
+
+    private MedCaseStatus mapMedicalCaseStatus() {
+        return switch (status) {
+            case ACTIVE -> MedCaseStatus.ACTIVE;
+            case COMPLETED -> MedCaseStatus.COMPLETED;
+            case PLANNED -> MedCaseStatus.PLANNED;
+        };
     }
 
     public String toString() {

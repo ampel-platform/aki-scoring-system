@@ -4,6 +4,8 @@ import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvDate;
 import csv.TimeAdjustable;
+import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
+import de.uni_leipzig.ampel.sdk.io.message.patient.Sex;
 import lombok.*;
 
 import java.time.LocalDate;
@@ -56,6 +58,27 @@ public final class PatientData implements TimeAdjustable<PatientData> {
                 .creationDate(creationDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
                 .updateDate(updateDate.atStartOfDay().plusSeconds(offsetSeconds).toLocalDate())
                 .build();
+    }
+
+    public PatientMessage convertToPatientMessage() {
+        return new PatientMessage(
+                id,
+                mapPatientSex(),
+                dateOfBirth,
+                deceased,
+                creationDate,
+                dischargeTimestamp,
+                cancellationDate,
+                updateDate
+        );
+    }
+
+    private Sex mapPatientSex() {
+        return switch (sex) {
+            case FEMALE -> Sex.FEMALE;
+            case MALE -> Sex.MALE;
+            default -> Sex.UNKNOWN;
+        };
     }
 
     public String toString() {

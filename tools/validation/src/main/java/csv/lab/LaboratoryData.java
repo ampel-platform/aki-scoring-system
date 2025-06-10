@@ -4,6 +4,7 @@ import com.opencsv.bean.CsvBindByName;
 import com.opencsv.bean.CsvCustomBindByName;
 import com.opencsv.bean.CsvDate;
 import csv.TimeAdjustable;
+import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -76,6 +77,24 @@ public final class LaboratoryData implements TimeAdjustable<LaboratoryData> {
                 .analyteUnit(analyteUnit)
                 .measuredAt(measuredAt.plusSeconds(offsetSeconds)) // adjust
                 .build();
+    }
+
+    public LaboratoryMessage convertToLaboratoryMessage() {
+        return new LaboratoryMessage(
+                documentId,
+                documentVersion,
+                documentPart,
+                sequenceId,
+                medicalCaseId,
+                patientId,
+                orderId,
+                createdAt,
+                originatingSystem,
+                analyte,
+                analyteValue,
+                analyteUnit,
+                measuredAt
+        );
     }
 
     public String toString() {
