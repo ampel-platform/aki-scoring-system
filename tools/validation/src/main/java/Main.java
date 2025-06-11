@@ -11,16 +11,19 @@ import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
 import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
 import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
+import de.uni_leipzig.ampel.sdk.io.message.result.ResultMessage;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import util.PreProcessingUtil;
 
 import java.io.FileReader;
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.HashMap;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static java.lang.System.getenv;
@@ -29,7 +32,7 @@ import static java.util.Objects.requireNonNull;
 @Slf4j
 public class Main {
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws IOException, InterruptedException {
         var kafkaBootstrapServers = requireNonNull(getenv("KAFKA_BOOTSTRAP_SERVERS"), "kafka bootstrap servers must be specified");
         var patientDataSource = requireNonNull(getenv("PATIENT_DATA_SOURCE"), "patient data source must be specified");
         var medCaseDataSource = requireNonNull(getenv("MED_CASE_DATA_SOURCE"), "medical case data source must be specified");
@@ -186,6 +189,67 @@ public class Main {
         medicalCasePublisher.shutdown();
         procedurePublisher.shutdown();
         laboratoryPublisher.shutdown();
+
+
+        // READING BACK RESULTS
+        var resultReaderCfg = KafkaReaderConfig.builder()
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, "aki-validation-result")
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.ENABLE_AUTO_COMMIT, false)
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, 5000L)
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
+                .build();
+
+        var timer = new Timer();
+        var latch = new CountDownLatch(1);
+        TimerTask timerTask = createCountdownTask(latch);
+
+        List<Message<String, ResultMessage>> resultMessages = new ArrayList<>();
+        var resultReader = KafkaReader.<String, ResultMessage>builder()
+                .useBootstrapServers(kafkaBootstrapServers)
+                .forTopic(KafkaTopics.AMPEL_RESULT)
+                .withKafkaReaderConfig(resultReaderCfg)
+                .withDeserializationStrategy(
+                        new KafkaDeserializationStrategy<>(
+                                new StringDeserializer(),
+                                KafkaSerde.createKafkaDeserializer(ResultMessage.class)))
+                .withMessageConsumer(msg -> {
+                    timerTask.cancel();
+                    timer.purge();
+                    resultMessages.add(msg);
+                    timer.schedule(createCountdownTask(latch), 10000);
+                })
+                .build();
+
+        log.info("starting result message reader");
+        new Thread(resultReader).start();
+
+        // wait until there's no more incoming result messages
+        latch.await();
+
+        log.info("stopping result reader");
+        resultReader.shutdown();
+
+
+        var categories = new HashMap<String, Integer>();
+        for (Message<String, ResultMessage> resultMessage : resultMessages) {
+            var severity = resultMessage.body().severityRepresentation();
+            var occurrences = categories.getOrDefault(severity, 0);
+
+            categories.put(severity, occurrences + 1);
+        }
+
+        for (Map.Entry<String, Integer> cats : categories.entrySet()) {
+            log.info("category {} - #entries: {}", cats.getKey(), cats.getValue());
+        }
+    }
+
+    private static TimerTask createCountdownTask(CountDownLatch latch) {
+        return new TimerTask() {
+            @Override
+            public void run() {
+                latch.countDown();
+            }
+        };
     }
 
     private static <T> KafkaWriter<String, T> createKafkaWriter(String kafkaBootstrapServers,
