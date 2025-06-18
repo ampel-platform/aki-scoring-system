@@ -25,6 +25,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.stream.Collectors;
 
 import static java.lang.System.getenv;
 import static java.util.Objects.requireNonNull;
@@ -230,7 +231,7 @@ public class Main {
         var latch = new CountDownLatch(1);
         TimerTask timerTask = createCountdownTask(latch);
 
-        List<Message<String, ResultMessage>> resultMessages = new ArrayList<>();
+        List<ResultMessage> resultMessages = new ArrayList<>();
         var resultReader = KafkaReader.<String, ResultMessage>builder()
                 .useBootstrapServers(kafkaBootstrapServers)
                 .forTopic(KafkaTopics.AMPEL_RESULT)
@@ -242,7 +243,7 @@ public class Main {
                 .withMessageConsumer(msg -> {
                     timerTask.cancel();
                     timer.purge();
-                    resultMessages.add(msg);
+                    resultMessages.add(msg.body());
                     timer.schedule(createCountdownTask(latch), 10000);
                 })
                 .build();
@@ -259,8 +260,8 @@ public class Main {
 
 
         var categories = new HashMap<String, Integer>();
-        for (Message<String, ResultMessage> resultMessage : resultMessages) {
-            var severity = resultMessage.body().severityRepresentation();
+        for (ResultMessage resultMessage : resultMessages) {
+            var severity = resultMessage.severityRepresentation();
             var occurrences = categories.getOrDefault(severity, 0);
 
             categories.put(severity, occurrences + 1);
@@ -269,6 +270,55 @@ public class Main {
         for (Map.Entry<String, Integer> cats : categories.entrySet()) {
             log.info("category {} - #entries: {}", cats.getKey(), cats.getValue());
         }
+        
+        // categorize expectedResults
+        var relevantExpectedResults = PreProcessingUtil.filterResultsForOrdersOfExistingLabEntries(expectedResults, labData);
+        log.info("relevant expected results: #{}", relevantExpectedResults.size());
+        var orderIdResultMapping = relevantExpectedResults.stream()
+                .collect(
+                        Collectors.toMap(OutputData::getOrderId,
+                                r -> r,
+                                (prev, next) -> next,
+                                HashMap::new));
+        log.info("remaining expected results to be checked: #{}", orderIdResultMapping.size());
+
+        for (ResultMessage res : resultMessages) {
+            var resultOrderId = res.meta().get("workflowSummary").get("order_id").asText();
+            log.info("validating result for orderId: '{}'", resultOrderId);
+
+            var resSeverity = res.severityRepresentation() == null
+                    ? ""
+                    : res.severityRepresentation();
+
+            var expectedResult = orderIdResultMapping.remove(resultOrderId);
+            if (expectedResult == null) {
+                log.error("result for order '{}' is not part of the set of expected results", resultOrderId);
+                System.exit(1);
+                continue;
+            }
+
+            if (!Objects.equals(expectedResult.getMedicalCaseId(), res.medicalCaseId())
+                    || !Objects.equals(expectedResult.getSeverityRepresentation(), resSeverity)) {
+                log.error("results do not match | expected case id: '{}' got '{}' | expected severity '{}' got '{}'",
+                        expectedResult.getMedicalCaseId(), res.medicalCaseId(),
+                        expectedResult.getSeverityRepresentation(), resSeverity);
+                System.exit(1);
+            }
+        }
+
+        // what's left
+        if (!orderIdResultMapping.isEmpty()) {
+            log.warn("there are #{} entries left in the expected results that do not have a matching registered result",
+                    orderIdResultMapping.size());
+
+            for (OutputData remainingExpectedResult : orderIdResultMapping.values()) {
+                log.warn("expected result '{}' for order '{}' but got nothing",
+                        remainingExpectedResult.getSeverityRepresentation(), remainingExpectedResult.getOrderId());
+            }
+            System.exit(1);
+        }
+
+        System.exit(0);
     }
 
     private static TimerTask createCountdownTask(CountDownLatch latch) {
