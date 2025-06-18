@@ -437,7 +437,7 @@ public class WorkflowFactory {
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.RED)
-                                                        .severityRepresentation("AKIN1")
+                                                        .severityRepresentation("AKIN1 VANC")
                                                         .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung im Zusammenhang mit einer Vancomycintherpie hin" +
                                                                 " (AKIN-Stadium 1 nach KDIGO-Kriterien). Weiterführende " +
@@ -472,7 +472,7 @@ public class WorkflowFactory {
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.RED)
-                                                        .severityRepresentation("AKIN2")
+                                                        .severityRepresentation("AKIN2 VANC")
                                                         .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung im Zusammenhang mit einer Vancomycintherapie " +
                                                                 "hin (AKIN-Stadium 2 nach KDIGO-Kriterien). Weiterführende " +
@@ -508,7 +508,7 @@ public class WorkflowFactory {
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.RED)
-                                                        .severityRepresentation("AKIN3")
+                                                        .severityRepresentation("AKIN3 VANC")
                                                         .severityComment("Der Kreatininanstieg weist auf eine akute " +
                                                                 "Nierenschädigung im Zusammenhang mit einer Vancomycintherapie " +
                                                                 "hin (AKIN-Stadium 3 nach KDIGO-Kriterien). Weiterführende " +
