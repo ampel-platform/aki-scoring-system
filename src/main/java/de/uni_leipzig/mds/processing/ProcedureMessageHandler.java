@@ -62,7 +62,9 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
 
     private Predicate<ProcedureMessage> isConsiderableProcedure() {
         return (message) -> {
-            var isDialysis = PROCEDURE_CODES_DIALYSIS.contains(message.procedureCode());
+            var isDialysis = PROCEDURE_CODES_DIALYSIS.stream()
+                    .anyMatch(code -> message.procedureCode().toUpperCase().contains(code.toUpperCase()));
+
             if (!isDialysis) {
                 LOGGER.warn("procedure message `{}` is not a dialysis procedure", message.procedureId());
             }
