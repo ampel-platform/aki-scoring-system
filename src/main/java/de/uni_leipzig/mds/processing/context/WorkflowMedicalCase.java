@@ -22,7 +22,7 @@ public record WorkflowMedicalCase(
                                 && (cv.measuringTime().isEqual(to) || cv.measuringTime().isBefore(to)))
                 .toList();
 
-        var timeFilteredVancomycinLabValues = creatinineValues.stream().filter(
+        var timeFilteredVancomycinLabValues = vancomycinValues.stream().filter(
                         vv -> (vv.measuringTime().isEqual(from) || vv.measuringTime().isAfter(from))
                                 && (vv.measuringTime().isEqual(to) || vv.measuringTime().isBefore(to)))
                 .toList();
