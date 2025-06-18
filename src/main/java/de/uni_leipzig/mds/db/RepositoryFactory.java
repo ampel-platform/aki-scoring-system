@@ -41,15 +41,14 @@ public final class RepositoryFactory {
             throw new IllegalArgumentException("db connection string must include the database name");
         }
 
-        try (var dbClient = RepositoryFactoryUtil.createDBClient(dbConnectionString)) {
-            var db = dbClient.getDatabase(dbConnectionString.getDatabase());
+        var dbClient = RepositoryFactoryUtil.createDBClient(dbConnectionString);
+        var db = dbClient.getDatabase(dbConnectionString.getDatabase());
 
-            return new AkiRepoImpl(
-                    getInitializedLaboratoryCollection(db),
-                    getInitializedMedicalCaseCollection(db),
-                    getInitializedPatientCollection(db),
-                    getInitializedProcedureCollection(db));
-        }
+        return new AkiRepoImpl(
+                getInitializedLaboratoryCollection(db),
+                getInitializedMedicalCaseCollection(db),
+                getInitializedPatientCollection(db),
+                getInitializedProcedureCollection(db));
     }
 
     // Laboratory ------------------------------------------------------------------------------------------------------
