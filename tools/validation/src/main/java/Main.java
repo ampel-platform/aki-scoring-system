@@ -51,7 +51,9 @@ public class Main {
         var expectedResults = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(expectedResultsSource),
                 OutputData.class).parse();
 
-        var timeBasedUploadFunctions = new HashMap<LocalDateTime, Callable<Void>>(); // used for sorting
+        var labEntriesWithNaNValues = PreProcessingUtil.getLabEntriesWithNaNValues(labData);
+        labData.removeAll(labEntriesWithNaNValues);
+
         // Using this as a sort of multimap due to the fact that some timestamps may occur several times
         var timeBasedUploadFunctions = new HashMap<LocalDateTime, List<Callable<Void>>>(); // used for sorting
 
