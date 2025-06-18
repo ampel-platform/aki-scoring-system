@@ -250,6 +250,7 @@ public class Main {
 
         // wait until there's no more incoming result messages
         latch.await();
+        timer.cancel();
 
         log.info("stopping result reader");
         resultReader.shutdown();
