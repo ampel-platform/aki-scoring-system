@@ -46,89 +46,112 @@ public class Main {
                 MedicalCaseData.class).parse();
         var procedures = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(procedureDataSource),
                 ProcedureData.class).parse();
-        var labData = PreProcessingUtil.filterForNonNaNValues(CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(labDataSource),
-                LaboratoryData.class).parse());
+        var labData = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(labDataSource),
+                LaboratoryData.class).parse();
         var expectedResults = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(expectedResultsSource),
                 OutputData.class).parse();
 
         var timeBasedUploadFunctions = new HashMap<LocalDateTime, Callable<Void>>(); // used for sorting
+        // Using this as a sort of multimap due to the fact that some timestamps may occur several times
+        var timeBasedUploadFunctions = new HashMap<LocalDateTime, List<Callable<Void>>>(); // used for sorting
 
         // PATIENTS
         var patientMessageQueue = new LinkedBlockingQueue<Message<String, PatientMessage>>();
-        patients.forEach(patient -> timeBasedUploadFunctions.put(
-                patient.getCreationDate().atStartOfDay(),
-                () -> {
-                    log.info("uploading patient: {} - {}", patient.getId(), patient.getCreationDate().atStartOfDay());
-                    patientMessageQueue.put(new Message<>(
-                            patient.getId(),
-                            new MessageHeader(
-                                    patient.getCreationDate().atStartOfDay(),
-                                    "v1.0.0-validation",
-                                    "validation-test"
-                            ),
-                            patient.convertToPatientMessage()
-                    ));
-                    return null;
-                }));
+        patients.forEach(patient -> {
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(patient.getCreationDate()
+                    .atStartOfDay(), new ArrayList<>());
+
+            potentiallyExistingCallables.add(() -> {
+                log.info("uploading patient: {} - {}", patient.getId(), patient.getCreationDate().atStartOfDay());
+                patientMessageQueue.put(new Message<>(
+                        patient.getId(),
+                        new MessageHeader(
+                                patient.getCreationDate().atStartOfDay(),
+                                "v1.0.0-validation",
+                                "validation-test"
+                        ),
+                        patient.convertToPatientMessage()
+                ));
+                return null;
+            });
+
+            timeBasedUploadFunctions.put(patient.getCreationDate().atStartOfDay(), potentiallyExistingCallables);
+        });
 
 
         // MEDICAL CASES
         var medicalCaseMessageQueue = new LinkedBlockingQueue<Message<String, MedCaseMessage>>();
-        medicalCases.forEach(medicalCase -> timeBasedUploadFunctions.put(
-                medicalCase.getCreationDate().atStartOfDay(),
-                () -> {
-                    log.info("uploading medical case: {} - {}", medicalCase.getId(), medicalCase.getCreationDate().atStartOfDay());
-                    medicalCaseMessageQueue.put(new Message<>(
-                            medicalCase.getId(),
-                            new MessageHeader(
-                                    medicalCase.getCreationDate().atStartOfDay(),
-                                    "v1.0.0-validation",
-                                    "validation-test"
-                            ),
-                            medicalCase.convertToMedicalCaseMessage()
-                    ));
-                    return null;
-                }));
+        medicalCases.forEach(medicalCase -> {
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(medicalCase.getCreationDate()
+                    .atStartOfDay(), new ArrayList<>());
+
+            potentiallyExistingCallables.add(() -> {
+                log.info("uploading medical case: {} - {}", medicalCase.getId(), medicalCase.getCreationDate()
+                        .atStartOfDay());
+                medicalCaseMessageQueue.put(new Message<>(
+                        medicalCase.getId(),
+                        new MessageHeader(
+                                medicalCase.getCreationDate().atStartOfDay(),
+                                "v1.0.0-validation",
+                                "validation-test"
+                        ),
+                        medicalCase.convertToMedicalCaseMessage()
+                ));
+                return null;
+            });
+
+            timeBasedUploadFunctions.put(medicalCase.getCreationDate().atStartOfDay(), potentiallyExistingCallables);
+        });
 
 
         // PROCEDURES
         var procedureMessageQueue = new LinkedBlockingQueue<Message<String, ProcedureMessage>>();
-        procedures.forEach(procedure -> timeBasedUploadFunctions.put(
-                procedure.getPerformedOn(),
-                () -> {
-                    log.info("uploading procedure: {} - {}", procedure.getId(), procedure.getPerformedOn());
-                    procedureMessageQueue.put(new Message<>(
-                            procedure.getMedicalCaseId(),
-                            new MessageHeader(
-                                    procedure.getPerformedOn(),
-                                    "v1.0.0-validation",
-                                    "validation-test"
-                            ),
-                            procedure.convertToProcedureMessage()
-                    ));
-                    return null;
-                }
-        ));
+        procedures.forEach(procedure -> {
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(procedure.getPerformedOn(),
+                    new ArrayList<>());
+
+            potentiallyExistingCallables.add(() -> {
+                        log.info("uploading procedure: {} - {}", procedure.getId(), procedure.getPerformedOn());
+                        procedureMessageQueue.put(new Message<>(
+                                procedure.getMedicalCaseId(),
+                                new MessageHeader(
+                                        procedure.getPerformedOn(),
+                                        "v1.0.0-validation",
+                                        "validation-test"
+                                ),
+                                procedure.convertToProcedureMessage()
+                        ));
+                        return null;
+                    }
+            );
+
+            timeBasedUploadFunctions.put(procedure.getPerformedOn(), potentiallyExistingCallables);
+        });
 
 
         // LABORATORY
         var laboratoryMessageQueue = new LinkedBlockingQueue<Message<String, LaboratoryMessage>>();
-        labData.forEach(lab -> timeBasedUploadFunctions.put(
-                lab.getMeasuredAt(),
-                () -> {
-                    log.info("uploading laboratory event: {} - {}", lab.getDocumentId(), lab.getMeasuredAt());
-                    laboratoryMessageQueue.put(new Message<>(
-                            lab.getMedicalCaseId(),
-                            new MessageHeader(
-                                    lab.getCreatedAt(),
-                                    "v1.0.0-validation",
-                                    "validation-test"
-                            ),
-                            lab.convertToLaboratoryMessage()
-                    ));
-                    return null;
-                }
-        ));
+        labData.forEach(lab -> {
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(lab.getMeasuredAt(),
+                    new ArrayList<>());
+
+            potentiallyExistingCallables.add(() -> {
+                        log.info("uploading laboratory event: {} - {}", lab.getDocumentId(), lab.getMeasuredAt());
+                        laboratoryMessageQueue.put(new Message<>(
+                                lab.getMedicalCaseId(),
+                                new MessageHeader(
+                                        lab.getCreatedAt(),
+                                        "v1.0.0-validation",
+                                        "validation-test"
+                                ),
+                                lab.convertToLaboratoryMessage()
+                        ));
+                        return null;
+                    }
+            );
+
+            timeBasedUploadFunctions.put(lab.getMeasuredAt(), potentiallyExistingCallables);
+        });
 
 
         var patientPublisher = createKafkaWriter(kafkaBootstrapServers, KafkaTopics.PATIENTS, patientMessageQueue,
@@ -157,17 +180,19 @@ public class Main {
 
         // Execute
         for (LocalDateTime time : eventOccurrencesDesc) {
-            try {
-                timeBasedUploadFunctions.get(time)
-                        .call();
-                // wait until all queues are empty
-                log.info("waiting for message queues to get drained");
-                waitUntilMessageQueueIsDrained(patientMessageQueue);
-                waitUntilMessageQueueIsDrained(medicalCaseMessageQueue);
-                waitUntilMessageQueueIsDrained(procedureMessageQueue);
-                waitUntilMessageQueueIsDrained(laboratoryMessageQueue);
-            } catch (Exception e) {
-                log.error("could not upload resource for timestamp {}", time, e);
+            var uploadFns = timeBasedUploadFunctions.get(time);
+            for (Callable<Void> uploadFn : uploadFns) {
+                try {
+                    uploadFn.call();
+                    // wait until all queues are empty
+                    log.debug("waiting for message queues to get drained");
+                    waitUntilMessageQueueIsDrained(patientMessageQueue);
+                    waitUntilMessageQueueIsDrained(medicalCaseMessageQueue);
+                    waitUntilMessageQueueIsDrained(procedureMessageQueue);
+                    waitUntilMessageQueueIsDrained(laboratoryMessageQueue);
+                } catch (Exception e) {
+                    log.error("could not upload resource for timestamp {}", time, e);
+                }
             }
         }
 
