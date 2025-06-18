@@ -80,7 +80,9 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
                         labMessagePayload.analyteMeasuringTimestamp()));
 
         if (isResemblingCreatinineValue().test(labMessagePayload)) {
+            LOGGER.info("triggering workflow execution");
             triggerWorkflowRun(labMessagePayload.caseId(),
+                    labMessagePayload.orderId(),
                     labMessagePayload.analyteMeasuringTimestamp().minusDays(7),
                     labMessagePayload.analyteMeasuringTimestamp());
         }
@@ -121,13 +123,15 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         };
     }
 
-    private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId) {
+    private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId, String orderId) {
         var medicalCase = akiRepo.findMedicalCase(caseId).orElse(null);
         if (medicalCase == null) {
+            LOGGER.warn("no associated medical case for laboratory order '{}'", orderId);
             return Optional.empty();
         }
         var patient = akiRepo.findPatientInCase(caseId).orElse(null);
         if (patient == null) {
+            LOGGER.warn("no associated patient for laboratory order '{}'", orderId);
             return Optional.empty();
         }
         var labValues = akiRepo.findLabValuesInCase(caseId)
@@ -172,16 +176,18 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         ));
     }
 
-    private void triggerWorkflowRun(String medicalCaseId, LocalDateTime oldestConsideredDateTime,
+    private void triggerWorkflowRun(String medicalCaseId, String orderId,
+                                               LocalDateTime oldestConsideredDateTime,
                                     LocalDateTime latestConsideredDateTime) {
-        generateMedicalCaseForWorkflowRun(medicalCaseId)
+        generateMedicalCaseForWorkflowRun(medicalCaseId, orderId)
                 .map(mc -> mc.filterForValuesBetween(
                         oldestConsideredDateTime,
                         latestConsideredDateTime))
                 .ifPresentOrElse(
                         (workflowMedicalCase) -> {
                             if (!workflowMedicalCase.isSufficientForWorkflowRun()) {
-                                LOGGER.warn("skipping workflow run because required information is still missing");
+                                LOGGER.warn("skipping workflow run for order '{}' because required information is" +
+                                        " still missing", orderId);
                             }
 
                             var workflowInputParams = new Parameter()
@@ -193,8 +199,9 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
                                     workflowInputParams
                             ));
                         },
-                        () -> LOGGER.warn("skipping workflow run despite having registered a creatinine value" +
-                                " because other information required by the workflow is still missing")
+                        () -> LOGGER.warn("skipping workflow run for order '{}' despite having registered a " +
+                                "creatinine value because other information required by the workflow is " +
+                                "still missing", orderId)
                 );
     }
 }

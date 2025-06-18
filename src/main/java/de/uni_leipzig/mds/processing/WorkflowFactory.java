@@ -60,6 +60,7 @@ public class WorkflowFactory {
                                     var triggerValue = medicalCase.getLatestCreatinineValue().get();
 
                                     summaryBuilder.patientDateOfBirth(medicalCase.patient().dateOfBirth());
+                                    summaryBuilder.orderId(triggerValue.orderId());
                                     return Either.right(Optional.of(
                                             inputParams.set(TRIGGER_ANALYTE, triggerValue)
                                     ));
@@ -639,6 +640,8 @@ public class WorkflowFactory {
     @Data
     @Builder
     private static class Summary {
+        @JsonProperty("order_id")
+        private final String orderId;
         @JsonProperty("patient_date_of_birth")
         private final LocalDate patientDateOfBirth;
         @JsonProperty("min_cre_48")
