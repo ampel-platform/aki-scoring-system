@@ -22,6 +22,7 @@ public final class PatientMessageHandler implements MessageHandler<PatientMessag
 
     @Override
     public void handleMessage(Message<String, PatientMessage> message) {
+        LOGGER.debug("received patient message");
         var patientMessagePayload = message.body();
 
         LOGGER.debug("inserting patient with id `{}`", patientMessagePayload.patientId());

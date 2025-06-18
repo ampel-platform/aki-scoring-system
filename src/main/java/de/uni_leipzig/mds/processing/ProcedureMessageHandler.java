@@ -38,6 +38,8 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
 
     @Override
     public void handleMessage(Message<String, ProcedureMessage> message) {
+        LOGGER.debug("received procedure message");
+
         var procedureMessagePayload = message.body();
 
         var messageFilterCriterion = isConsiderableProcedure()

@@ -55,6 +55,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
 
     @Override
     public void handleMessage(Message<String, LaboratoryMessage> message) {
+        LOGGER.debug("received laboratory message");
         var labMessagePayload = message.body();
 
         var messageFilterCriterion = isConsiderableLaboratoryValue()

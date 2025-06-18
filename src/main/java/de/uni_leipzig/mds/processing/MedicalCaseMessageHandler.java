@@ -22,6 +22,7 @@ public final class MedicalCaseMessageHandler implements MessageHandler<MedCaseMe
 
     @Override
     public void handleMessage(Message<String, MedCaseMessage> message) {
+        LOGGER.debug("received medical case message");
         var medicalCaseMessagePayload = message.body();
         LOGGER.debug("inserting medical case with id `{}`", medicalCaseMessagePayload.caseId());
 
