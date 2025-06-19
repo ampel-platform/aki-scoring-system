@@ -1,7 +1,7 @@
 package de.uni_leipzig.mds.processing;
 
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Parameter;
-import de.uni_leipzig.ampel.sdk.evaluation.workflow.PatientCaseIdentifier;
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.PatientMedicalCaseIdentifier;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowPipeline;
 import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
@@ -177,7 +177,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
     }
 
     private void triggerWorkflowRun(String medicalCaseId, String orderId,
-                                               LocalDateTime oldestConsideredDateTime,
+                                    LocalDateTime oldestConsideredDateTime,
                                     LocalDateTime latestConsideredDateTime) {
         generateMedicalCaseForWorkflowRun(medicalCaseId, orderId)
                 .map(mc -> mc.filterForValuesBetween(
@@ -195,9 +195,8 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
 
                             LOGGER.info("triggering aki workflow due to registered creatinine value");
                             workflowInputChannel.add(new WorkflowPipeline.WorkflowPipelineInput(
-                                    new PatientCaseIdentifier(workflowMedicalCase.patient().id(), workflowMedicalCase.caseId()),
-                                    workflowInputParams
-                            ));
+                                    new PatientMedicalCaseIdentifier(workflowMedicalCase.patient().id(),
+                                            workflowMedicalCase.caseId()), workflowInputParams));
                         },
                         () -> LOGGER.warn("skipping workflow run for order '{}' despite having registered a " +
                                 "creatinine value because other information required by the workflow is " +
