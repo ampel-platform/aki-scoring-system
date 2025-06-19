@@ -33,7 +33,6 @@ public class Main {
         var kafkaConsumerCommitTimeoutMs = requireNonNull(getenv("KAFKA_CONSUMER_COMMIT_TIMEOUT_MS"), "Kafka consumer commit " +
                 "timeout in ms must be specified");
 
-
         //var incomingMessages = new LinkedBlockingQueue<Tuple2<KafkaTopics, Message<String, ?>>>();
         var sharedTopicReaderConfig = KafkaReaderConfig.builder()
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, kafkaConsumerGroupId)
@@ -53,7 +52,7 @@ public class Main {
             );
 
             var akiWorkflow = WorkflowFactory.createAkiWorkflow();
-            var akiWorkflowScheduler = WorkflowScheduler.createVirtualWorkflowScheduler(akiWorkflow);
+            var akiWorkflowScheduler = WorkflowScheduler.createVirtualWorkflowScheduler();
 
             var workflowPipelineInputQueue = new LinkedBlockingQueue<WorkflowPipeline.WorkflowPipelineInput>();
             var workflowPipelineOutputQueue = new LinkedBlockingQueue<Message<String, ResultMessage>>();
@@ -61,6 +60,7 @@ public class Main {
             var workflowScheduler = new Thread(WorkflowPipeline.builder()
                     .withIOQueues(workflowPipelineInputQueue, workflowPipelineOutputQueue)
                     .withScheduler(akiWorkflowScheduler)
+                    .withWorkflow(akiWorkflow)
                     .build());
 
             var labMessageHandler = new LaboratoryMessageHandler(akiRepo, workflowPipelineInputQueue);

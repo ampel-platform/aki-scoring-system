@@ -24,7 +24,7 @@ public final class AkiRepo implements IAkiRepo {
     @Override
     public void insertProcedure(Procedure procedure) {
         requireNonNull(procedure, "procedure must not be null");
-        procedureRepo.insert(procedure);
+        procedureRepo.insertProcedure(procedure);
     }
 
     @Override
@@ -48,7 +48,7 @@ public final class AkiRepo implements IAkiRepo {
     @Override
     public List<Procedure> findProceduresInCase(String caseId) {
         neitherNullNorBlank(caseId, "case id must neither be null nor blank");
-        return procedureRepo.findAllByCase(caseId);
+        return procedureRepo.findProceduresInCase(caseId);
     }
 
     @Override
