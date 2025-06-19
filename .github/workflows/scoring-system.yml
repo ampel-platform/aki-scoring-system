@@ -1,9 +1,10 @@
-name: CI
+name: CI (AKI Scoring System)
 
 on:
   push:
     branches: [ "**" ]
     tags: [ "v[0-9]+.[0-9]+.[0-9]+**" ]
+    paths: ["!tools/**"]
   pull_request:
     branches: [ "main" ]
 
