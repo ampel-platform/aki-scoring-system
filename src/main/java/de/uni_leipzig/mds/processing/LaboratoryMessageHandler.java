@@ -158,7 +158,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
     }
 
     private void triggerWorkflowRunWithCleanup(String medicalCaseId, String orderId,
-                                    LocalDateTime oldestConsideredDateTime,
+                                               LocalDateTime oldestConsideredDateTime,
                                                LocalDateTime latestConsideredDateTime) {
         generateMedicalCaseForWorkflowRun(medicalCaseId, orderId)
                 .map(mc -> mc.filterForValuesBetween(
