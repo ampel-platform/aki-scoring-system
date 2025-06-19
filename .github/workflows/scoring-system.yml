@@ -51,6 +51,14 @@ jobs:
           servers: |
             [{"id": "ampel", "username": "${{ github.actor }}", "password": "${{ secrets.AMPEL_CDSS_ORG_PRIVATE_PACKAGE_ACCESS_TOKEN }}"}]
 
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      # TODO: check whether the following is already covered by the action above (Docker meta)
       - name: Release Info Preparation
         id: release-prep
         run: |
@@ -83,5 +91,6 @@ jobs:
           platforms: linux/amd64,linux/arm64
           tags: |
             ghcr.io/${{ steps.release-prep.outputs.REPOSITORY }}:${{ steps.release-prep.outputs.VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
           file: ./docker/Dockerfile
           push: true
