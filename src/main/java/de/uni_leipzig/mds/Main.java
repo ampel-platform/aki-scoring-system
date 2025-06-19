@@ -1,23 +1,21 @@
 package de.uni_leipzig.mds;
 
-import de.uni_leipzig.mds.common.types.proto.generated.ampel_event.AmpelEventProtoBuf;
-import de.uni_leipzig.mds.data.db.ClientFactory;
-import de.uni_leipzig.mds.data.db.DBConnectionSettings;
-import de.uni_leipzig.mds.data.db.RepoFactory;
-import de.uni_leipzig.mds.evaluation.workflow.WorkflowPipeline;
-import de.uni_leipzig.mds.evaluation.workflow.WorkflowScheduler;
-import de.uni_leipzig.mds.io.connection.*;
-import de.uni_leipzig.mds.io.connection.serialization.PatientCaseKeyDeserializer;
-import de.uni_leipzig.mds.io.connection.serialization.PatientCaseKeySerializer;
-import de.uni_leipzig.mds.io.connection.serialization.types.LaboratoryValueMessage;
-import de.uni_leipzig.mds.io.connection.serialization.types.PatientMessage;
-import de.uni_leipzig.mds.io.connection.serialization.types.ProcedureMessage;
-import io.vavr.Tuple2;
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowPipeline;
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowScheduler;
+import de.uni_leipzig.ampel.sdk.io.kafka.*;
+import de.uni_leipzig.ampel.sdk.io.message.Message;
+import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
+import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
+import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
+import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
+import de.uni_leipzig.ampel.sdk.io.message.result.ResultMessage;
+import de.uni_leipzig.mds.db.*;
+import de.uni_leipzig.mds.processing.*;
+import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.time.Duration;
-import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static java.lang.System.getenv;
@@ -35,110 +33,93 @@ public class Main {
         var kafkaConsumerCommitTimeoutMs = requireNonNull(getenv("KAFKA_CONSUMER_COMMIT_TIMEOUT_MS"), "Kafka consumer commit " +
                 "timeout in ms must be specified");
 
-
-        var incomingMessages = new LinkedBlockingQueue<Tuple2<KafkaTopic, Object>>();
-        var patientCaseKeyDeserializer = new PatientCaseKeyDeserializer();
-        var patientCaseKeySerializer = new PatientCaseKeySerializer();
-
-        var labEventReader = new Thread(KafkaReadConnector.create(
-                new KafkaReadConnectorSettings<LaboratoryValueMessage>(
-                        List.of(kafkaBootstrapServers),
-                        kafkaConsumerGroupId + "_L",
-                        KafkaTopic.LABORATORY_VALUES,
-                        Duration.ofMillis(Long.parseLong(kafkaConsumerCommitTimeoutMs)),
-                        patientCaseKeyDeserializer,
-                        (message) -> {
-                            try {
-                                incomingMessages.put(new Tuple2<>(KafkaTopic.LABORATORY_VALUES, message.payload()));
-                                LOGGER.trace("enqueued message of topic `{}`",
-                                        KafkaTopic.LABORATORY_VALUES.getTopicRepresentation());
-                            } catch (InterruptedException e) {
-                                LOGGER.warn("interrupted while enqueueing incoming events", e);
-                            }
-                        }
-                )
-        ));
-
-        var patientEventReader = new Thread(KafkaReadConnector.create(
-                new KafkaReadConnectorSettings<PatientMessage>(
-                        List.of(kafkaBootstrapServers),
-                        kafkaConsumerGroupId + "_PAT",
-                        KafkaTopic.PATIENTS,
-                        Duration.ofMillis(Long.parseLong(kafkaConsumerCommitTimeoutMs)),
-                        patientCaseKeyDeserializer,
-                        (message) -> {
-                            try {
-                                incomingMessages.put(new Tuple2<>(KafkaTopic.PATIENTS, message.payload()));
-                                LOGGER.trace("enqueued message of topic `{}`",
-                                        KafkaTopic.PATIENTS.getTopicRepresentation());
-                            } catch (InterruptedException e) {
-                                LOGGER.warn("interrupted while enqueueing incoming events", e);
-                            }
-                        }
-                )
-        ));
-
-        var procedureEventReader = new Thread(KafkaReadConnector.create(
-                new KafkaReadConnectorSettings<ProcedureMessage>(
-                        List.of(kafkaBootstrapServers),
-                        kafkaConsumerGroupId + "_PROC",
-                        KafkaTopic.PROCEDURES,
-                        Duration.ofMillis(Long.parseLong(kafkaConsumerCommitTimeoutMs)),
-                        patientCaseKeyDeserializer,
-                        (message) -> {
-                            try {
-                                incomingMessages.put(new Tuple2<>(KafkaTopic.PROCEDURES, message.payload()));
-                                LOGGER.trace("enqueued message of topic `{}`",
-                                        KafkaTopic.PROCEDURES.getTopicRepresentation());
-                            } catch (InterruptedException e) {
-                                LOGGER.warn("interrupted while enqueueing incoming events", e);
-                            }
-                        }
-                )
-        ));
-
-        LOGGER.info("starting lab event reader");
-        labEventReader.start();
-        LOGGER.info("starting patient event reader");
-        patientEventReader.start();
-        LOGGER.info("starting procedure event reader");
-        procedureEventReader.start();
+        //var incomingMessages = new LinkedBlockingQueue<Tuple2<KafkaTopics, Message<String, ?>>>();
+        var sharedTopicReaderConfig = KafkaReaderConfig.builder()
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, kafkaConsumerGroupId)
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.ENABLE_AUTO_COMMIT, false)
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, Long.parseLong(kafkaConsumerCommitTimeoutMs))
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
+                .build();
 
         var dbConnSettings = new DBConnectionSettings(mongoDBHost, mongoDBPort, mongoDBName);
         try (var dbClient = ClientFactory.createDBClient(dbConnSettings.getConnectionString())) {
-            var repoFactory = new RepoFactory(dbClient.getDatabase(dbConnSettings.getDbName()));
-            var akiRepo = repoFactory.createAkiRepo();
+            var db = dbClient.getDatabase(dbConnSettings.getDbName());
+            var akiRepo = new AkiRepo(
+                    ProcedureRepo.initialize(db),
+                    LabValueRepo.initialize(db),
+                    MedicalCaseRepo.initialize(db),
+                    PatientRepo.initialize(db)
+            );
 
             var akiWorkflow = WorkflowFactory.createAkiWorkflow();
-            var akiWorkflowScheduler = WorkflowScheduler.createVirtualWorkflowScheduler(akiWorkflow);
+            var akiWorkflowScheduler = WorkflowScheduler.createVirtualWorkflowScheduler();
 
             var workflowPipelineInputQueue = new LinkedBlockingQueue<WorkflowPipeline.WorkflowPipelineInput>();
-            var workflowPipelineOutputQueue = new LinkedBlockingQueue<AmpelMessage<AmpelEventProtoBuf>>();
+            var workflowPipelineOutputQueue = new LinkedBlockingQueue<Message<String, ResultMessage>>();
 
-            var resultPublisher = new Thread(KafkaWriteConnector.create(
-                    new KafkaWriteConnectorSettings(
-                            List.of(kafkaBootstrapServers),
-                            "aki-ruleset",
-                            KafkaTopic.AMPEL_RESULT,
-                            patientCaseKeySerializer
-                    ),
-                    workflowPipelineOutputQueue
-            ));
-
-            LOGGER.info("starting ampel result publisher");
-            resultPublisher.start();
-
-            var pipeline = WorkflowPipeline.builder()
+            var workflowScheduler = new Thread(WorkflowPipeline.builder()
                     .withIOQueues(workflowPipelineInputQueue, workflowPipelineOutputQueue)
                     .withScheduler(akiWorkflowScheduler)
+                    .withWorkflow(akiWorkflow)
+                    .build());
+
+            var labMessageHandler = new LaboratoryMessageHandler(akiRepo, workflowPipelineInputQueue);
+            var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, kafkaBootstrapServers, sharedTopicReaderConfig,
+                    labMessageHandler, LaboratoryMessage.class);
+
+            var medicalCaseMessageHandler = new MedicalCaseMessageHandler(akiRepo);
+            var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, kafkaBootstrapServers,
+                    sharedTopicReaderConfig, medicalCaseMessageHandler, MedCaseMessage.class);
+
+            var patientMessageHandler = new PatientMessageHandler(akiRepo);
+            var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, kafkaBootstrapServers, sharedTopicReaderConfig,
+                    patientMessageHandler, PatientMessage.class);
+
+            var procedureMessageHandler = new ProcedureMessageHandler(akiRepo);
+            var procedureTopicReader = getTopicReader(KafkaTopics.PROCEDURES, kafkaBootstrapServers,
+                    sharedTopicReaderConfig, procedureMessageHandler, ProcedureMessage.class);
+
+            var resultPublisher = KafkaWriter.<String, ResultMessage>builder()
+                    .useBootstrapServers(kafkaBootstrapServers)
+                    .useTopic(KafkaTopics.AMPEL_RESULT)
+                    .withMessagePublishingChannel(workflowPipelineOutputQueue)
+                    .withSerializationStrategy(
+                            new KafkaSerializationStrategy<>(
+                                    new StringSerializer(),
+                                    KafkaSerde.createKafkaSerializer(ResultMessage.class)))
+                    .withKafkaWriterConfig(
+                            KafkaWriterConfig.builder()
+                                    .setConfigItem(KafkaWriterConfig.KafkaWriterConfigItem.CLIENT_ID, "aki-service")
+                                    .build())
                     .build();
 
-            var workflowScheduler = new Thread(pipeline);
-            LOGGER.info("starting worklow scheduler");
+            LOGGER.info("starting workflow scheduler");
             workflowScheduler.start();
-
-            var messageProcessor = new MessageProcessor(incomingMessages, workflowPipelineInputQueue, akiRepo);
-            messageProcessor.run();
+            LOGGER.info("starting lab event reader");
+            labTopicReader.start();
+            LOGGER.info("starting patient event reader");
+            patientTopicReader.start();
+            LOGGER.info("starting medical case event reader");
+            medicalCaseTopicReader.start();
+            LOGGER.info("starting procedure event reader");
+            procedureTopicReader.start();
+            LOGGER.info("starting ampel result publisher");
+            resultPublisher.run();
         }
+    }
+
+    private static <T> Thread getTopicReader(KafkaTopics topic, String bootstrapServers, KafkaReaderConfig readerConfig,
+                                             MessageHandler<T> messageHandler, Class<T> messageType) {
+        return new Thread(KafkaReader.<String, T>builder()
+                .useBootstrapServers(bootstrapServers)
+                .forTopic(topic)
+                .withKafkaReaderConfig(readerConfig)
+                .withDeserializationStrategy(
+                        new KafkaDeserializationStrategy<>(
+                                new StringDeserializer(),
+                                KafkaSerde.createKafkaDeserializer(messageType)))
+                .withMessageConsumer(
+                        messageHandler::handleMessage)
+                .build());
     }
 }
