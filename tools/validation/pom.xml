@@ -14,6 +14,20 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
+    <repositories>
+        <repository>
+            <id>ampel</id>
+            <name>GitHub AMPEL-CDSS-ORG Apache Maven Packages</name>
+            <url>https://maven.pkg.github.com/AMPEL-CDSS-ORG/*</url>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+    </repositories>
+
     <dependencies>
         <dependency>
             <groupId>de.uni_leipzig.ampel</groupId>
