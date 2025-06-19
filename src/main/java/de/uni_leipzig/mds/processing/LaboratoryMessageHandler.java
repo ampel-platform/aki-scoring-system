@@ -1,12 +1,12 @@
 package de.uni_leipzig.mds.processing;
 
+import de.uni_leipzig.ampel.sdk.evaluation.workflow.Context;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Parameter;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.PatientMedicalCaseIdentifier;
-import de.uni_leipzig.ampel.sdk.evaluation.workflow.WorkflowPipeline;
 import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
-import de.uni_leipzig.mds.db.IAkiRepo;
-import de.uni_leipzig.mds.db.LabValue;
+import de.uni_leipzig.mds.db.AkiRepo;
+import de.uni_leipzig.mds.db.types.LaboratoryEntry;
 import de.uni_leipzig.mds.processing.context.WorkflowLabValue;
 import de.uni_leipzig.mds.processing.context.WorkflowMedicalCase;
 import de.uni_leipzig.mds.processing.context.WorkflowPatient;
@@ -22,17 +22,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.function.Predicate;
 
 import static de.uni_leipzig.mds.processing.WorkflowFactory.MEDICAL_CASE_PARAM;
-import static java.time.temporal.ChronoUnit.DAYS;
 import static java.util.Objects.requireNonNull;
 
 public final class LaboratoryMessageHandler implements MessageHandler<LaboratoryMessage> {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(LaboratoryMessageHandler.class);
-
-    /**
-     * Denotes the maximum allowed age of a laboratory message in days.
-     */
-    private static final int MAX_LABORATORY_MESSAGE_AGE_IN_DAYS = 7;
 
     /**
      * Codes that denote a creatinine value.
@@ -44,13 +38,16 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
      */
     private static final List<String> LAB_CODES_VANCOMYCIN = List.of("VANC-K_S", "VANC-S_S", "VANC-T_S", "VANC-U_S");
 
-    private final IAkiRepo akiRepo;
-    private final BlockingQueue<WorkflowPipeline.WorkflowPipelineInput> workflowInputChannel;
+    private final AkiRepo akiRepo;
+    private final BlockingQueue<WorkflowTrigger> workflowTriggerQueue;
+    private final WorkflowCleaner workflowCleaner;
 
-    public LaboratoryMessageHandler(IAkiRepo akiRepo,
-                                    BlockingQueue<WorkflowPipeline.WorkflowPipelineInput> workflowInputChannel) {
+    public LaboratoryMessageHandler(AkiRepo akiRepo,
+                                    BlockingQueue<WorkflowTrigger> workflowTriggerQueue,
+                                    WorkflowCleaner workflowCleaner) {
         this.akiRepo = requireNonNull(akiRepo, "aki repository must not be null");
-        this.workflowInputChannel = requireNonNull(workflowInputChannel, "workflow message channel must not be null");
+        this.workflowTriggerQueue = requireNonNull(workflowTriggerQueue, "workflow trigger queue must not be null");
+        this.workflowCleaner = requireNonNull(workflowCleaner, "workflow cleaner must not be null");
     }
 
     @Override
@@ -58,18 +55,15 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         LOGGER.debug("received laboratory message");
         var labMessagePayload = message.body();
 
-        var messageFilterCriterion = isConsiderableLaboratoryValue()
-                .and(Predicate.not(isExceedingMaxAllowedAge()));
-
-        if (!messageFilterCriterion.test(labMessagePayload)) {
+        if (!isConsiderableLaboratoryValue().test(labMessagePayload)) {
             LOGGER.warn("laboratory message `{}` won't get handled since it was filtered out",
                     labMessagePayload.documentId());
             return;
         }
 
         LOGGER.debug("inserting laboratory value with id `{}`", labMessagePayload.documentId());
-        akiRepo.insertLabValue(
-                new LabValue(
+        akiRepo.insertLaboratoryEntry(
+                new LaboratoryEntry(
                         ObjectId.get(),
                         labMessagePayload.caseId(),
                         labMessagePayload.orderId(),
@@ -81,7 +75,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
 
         if (isResemblingCreatinineValue().test(labMessagePayload)) {
             LOGGER.info("triggering workflow execution");
-            triggerWorkflowRun(labMessagePayload.caseId(),
+            triggerWorkflowRunWithCleanup(labMessagePayload.caseId(),
                     labMessagePayload.orderId(),
                     labMessagePayload.analyteMeasuringTimestamp().minusDays(7),
                     labMessagePayload.analyteMeasuringTimestamp());
@@ -110,31 +104,18 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         return (message) -> LAB_CODES_VANCOMYCIN.contains(message.analyte().toUpperCase());
     }
 
-    private Predicate<LaboratoryMessage> isExceedingMaxAllowedAge() {
-        return (message) -> {
-            var ageInDays = Math.abs(message.analyteMeasuringTimestamp().until(LocalDateTime.now(), DAYS));
-            var exceedsMaximumAge = ageInDays > MAX_LABORATORY_MESSAGE_AGE_IN_DAYS;
-
-            if (exceedsMaximumAge) {
-                LOGGER.warn("laboratory message `{}` exceeds maximum allowed age of `{}` days",
-                        message.documentId(), MAX_LABORATORY_MESSAGE_AGE_IN_DAYS);
-            }
-            return exceedsMaximumAge;
-        };
-    }
-
     private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId, String orderId) {
-        var medicalCase = akiRepo.findMedicalCase(caseId).orElse(null);
+        var medicalCase = akiRepo.findMedicalCaseById(caseId).orElse(null);
         if (medicalCase == null) {
             LOGGER.warn("no associated medical case for laboratory order '{}'", orderId);
             return Optional.empty();
         }
-        var patient = akiRepo.findPatientInCase(caseId).orElse(null);
+        var patient = akiRepo.findPatientById(medicalCase.patientIdRef()).orElse(null);
         if (patient == null) {
             LOGGER.warn("no associated patient for laboratory order '{}'", orderId);
             return Optional.empty();
         }
-        var labValues = akiRepo.findLabValuesInCase(caseId)
+        var labValues = akiRepo.findAllLaboratoryEntriesInMedicalCase(caseId)
                 .stream().map(lv -> new WorkflowLabValue(
                         lv.orderId(),
                         lv.analyte(),
@@ -152,7 +133,7 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
                         lv -> LAB_CODES_VANCOMYCIN.contains(lv.analyte().toUpperCase()))
                 .toList();
 
-        var procedures = akiRepo.findProceduresInCase(caseId)
+        var procedures = akiRepo.findAllProceduresInMedicalCase(caseId)
                 .stream().map(proc -> new WorkflowProcedure(
                         proc.procedureId(),
                         proc.procedureCode(),
@@ -176,9 +157,9 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         ));
     }
 
-    private void triggerWorkflowRun(String medicalCaseId, String orderId,
+    private void triggerWorkflowRunWithCleanup(String medicalCaseId, String orderId,
                                     LocalDateTime oldestConsideredDateTime,
-                                    LocalDateTime latestConsideredDateTime) {
+                                               LocalDateTime latestConsideredDateTime) {
         generateMedicalCaseForWorkflowRun(medicalCaseId, orderId)
                 .map(mc -> mc.filterForValuesBetween(
                         oldestConsideredDateTime,
@@ -193,10 +174,18 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
                             var workflowInputParams = new Parameter()
                                     .set(MEDICAL_CASE_PARAM, workflowMedicalCase);
 
+                            var workflowContext = new Context();
+                            workflowContext.registerScoringSystemResultListener(
+                                    msg -> workflowCleaner
+                                            .expireEntriesInMedicalCaseOlderThan(medicalCaseId,
+                                                    oldestConsideredDateTime));
+
                             LOGGER.info("triggering aki workflow due to registered creatinine value");
-                            workflowInputChannel.add(new WorkflowPipeline.WorkflowPipelineInput(
+                            workflowTriggerQueue.add(new WorkflowTrigger(
                                     new PatientMedicalCaseIdentifier(workflowMedicalCase.patient().id(),
-                                            workflowMedicalCase.caseId()), workflowInputParams));
+                                            workflowMedicalCase.caseId())
+                                    , workflowContext
+                                    , workflowInputParams));
                         },
                         () -> LOGGER.warn("skipping workflow run for order '{}' despite having registered a " +
                                 "creatinine value because other information required by the workflow is " +

@@ -2,8 +2,8 @@ package de.uni_leipzig.mds.processing;
 
 import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
-import de.uni_leipzig.mds.db.IAkiRepo;
-import de.uni_leipzig.mds.db.MedicalCase;
+import de.uni_leipzig.mds.db.AkiRepo;
+import de.uni_leipzig.mds.db.types.MedicalCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -14,9 +14,9 @@ public final class MedicalCaseMessageHandler implements MessageHandler<MedCaseMe
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MedicalCaseMessageHandler.class);
 
-    private final IAkiRepo akiRepo;
+    private final AkiRepo akiRepo;
 
-    public MedicalCaseMessageHandler(IAkiRepo akiRepo) {
+    public MedicalCaseMessageHandler(AkiRepo akiRepo) {
         this.akiRepo = requireNonNull(akiRepo, "aki repository must not be null");
     }
 
