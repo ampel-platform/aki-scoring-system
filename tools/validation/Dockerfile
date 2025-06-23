@@ -7,7 +7,7 @@ LABEL org.opencontainers.image.authors="AMPEL CDSS Team <ampel@medizin.uni-leipz
 LABEL org.opencontainers.image.vendor="AMPEL CDSS"
 
 WORKDIR /opt/app
-COPY ./target/*jar-with-dependencies.jar ./aki-validation.jar
+COPY ./target/*.jar ./aki-validation.jar
 
 RUN addgroup --system ampel && adduser --system ampel --ingroup ampel
 RUN chown -R ampel:ampel /opt/app/
