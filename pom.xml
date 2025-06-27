@@ -6,7 +6,7 @@
 
     <groupId>de.uni-leipzig.mds</groupId>
     <artifactId>aki-service-java</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.3.0</version>
 
     <properties>
         <maven.compiler.source>21</maven.compiler.source>
@@ -37,8 +37,8 @@
 
         <dependency>
             <groupId>de.uni_leipzig.ampel</groupId>
-            <artifactId>ampel-framework</artifactId>
-            <version>0.1.0-rc1</version>
+            <artifactId>sdk</artifactId>
+            <version>0.3.0</version>
         </dependency>
 
         <dependency>
@@ -56,7 +56,7 @@
         <dependency>
             <groupId>ch.qos.logback</groupId>
             <artifactId>logback-classic</artifactId>
-            <version>1.4.8</version>
+            <version>1.5.16</version>
         </dependency>
 
         <dependency>
@@ -75,7 +75,7 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java</artifactId>
-            <version>4.26.0</version>
+            <version>4.29.3</version>
         </dependency>
 
         <dependency>
@@ -93,7 +93,7 @@
         <dependency>
             <groupId>com.google.protobuf</groupId>
             <artifactId>protobuf-java-util</artifactId>
-            <version>4.26.0</version>
+            <version>4.29.3</version>
         </dependency>
 
         <dependency>
@@ -127,7 +127,7 @@
         <dependency>
             <groupId>org.testcontainers</groupId>
             <artifactId>testcontainers</artifactId>
-            <version>1.19.8</version>
+            <version>1.20.5</version>
             <scope>test</scope>
         </dependency>
 
