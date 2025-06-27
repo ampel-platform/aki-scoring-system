@@ -6,13 +6,13 @@ import lombok.Getter;
 @Getter
 public final class OutputData {
 
-    @CsvBindByName(column = "X.BCX.S_HC_FALNR")
+    @CsvBindByName(column = "caseId")
     private String medicalCaseId;
 
-    @CsvBindByName(column = "X.BCX.S_HC_LA_ANR")
+    @CsvBindByName(column = "orderId")
     private String orderId;
 
-    @CsvBindByName(column = "X.BCX.S_HC_RGL_KS")
+    @CsvBindByName(column = "resultAmpel")
     private String severityRepresentation;
 
     public String toString() {
