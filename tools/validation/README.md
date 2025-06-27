@@ -33,12 +33,18 @@ system, run the following command (__make sure to substitute placeholders!__):
 docker run \
     --name "aki-validation" \
     --rm \
+    --network host \
+    -v <PATH_TO_PATIENT_TESTDATA_CSV>:/tmp/NPAT.testdata.csv:ro \
+    -v <PATH_TO_MEDICALCASE_TESTDATA_CSV>:/tmp/NFAL.testdata.csv:ro \
+    -v <PATH_TO_PROCEDURE_TESTDATA_CSV>:/tmp/NICP.testdata.csv:ro \
+    -v <PATH_TO_LABORATORY_TESTDATA_CSV>:/tmp/N2LABOR.testdata.csv:ro \
+    -v <PATH_TO_EXPECTED_RESULTS_TESTDATA_CSV>:/tmp/Output.testdata.csv:ro \
     -e KAFKA_BOOTSTRAP_SERVERS="<KAFKA_PLAINTEXT_URL>" \
-    -e PATIENT_DATA_SOURCE="<PATH_TO_PATIENT_TESTDATA_CSV>" \
-    -e MED_CASE_DATA_SOURCE="<PATH_TO_MEDICALCASE_TESTDATA_CSV>" \
-    -e PROCEDURE_DATA_SOURCE="<PATH_TO_PROCEDURE_TESTDATA_CSV>" \
-    -e LABORATORY_DATA_SOURCE="<PATH_TO_LABORATORY_TESTDATA_CSV>" \
-    -e EXPECTED_RESULTS_SOURCE="<PATH_TO_EXPECTED_RESULTS_TESTDATA_CSV>" \
+    -e PATIENT_DATA_SOURCE="/tmp/NPAT.testdata.csv" \
+    -e MED_CASE_DATA_SOURCE="/tmp/NFAL.testdata.csv" \
+    -e PROCEDURE_DATA_SOURCE="/tmp/NICP.testdata.csv" \
+    -e LABORATORY_DATA_SOURCE="/tmp/N2LABOR.testdata.csv" \
+    -e EXPECTED_RESULTS_SOURCE="/tmp/Output.testdata.csv" \
     ghcr.io/ampel-cdss-org/aki-service-validation:<VERSION>
 ```
 
