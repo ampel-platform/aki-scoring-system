@@ -1,7 +1,7 @@
 version: "3.8"
 services:
   kafka:
-    image: confluentinc/cp-kafka:7.5.3
+    image: apache/kafka:4.0.0@sha256:3f7b939115cd4872e9cee9369d80bd69712fde55f9902f46d793f64848dedc75
     hostname: kafka
     container_name: kafka
     ports:
@@ -15,15 +15,36 @@ services:
       KAFKA_JMX_PORT: 9101
       KAFKA_JMX_HOSTNAME: localhost
       KAFKA_PROCESS_ROLES: "broker,controller"
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: false
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:29093"
       KAFKA_LISTENERS: "PLAINTEXT://kafka:29092,CONTROLLER://localhost:29093,PLAINTEXT_HOST://0.0.0.0:9092"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       CLUSTER_ID: "pW0o31_zTWqplLKY9UDTQg"
+    volumes:
+      - ./data/kafka_addins:/tmp/kafka_addins:ro
+    healthcheck:
+      test: nc -z kafka 29092 || exit -1
+      start_period: 180s
+      interval: 5s
+      timeout: 10s
+      retries: 5
+
+  kafka-topic-init:
+    image: 'apache/kafka:4.0.0@sha256:3f7b939115cd4872e9cee9369d80bd69712fde55f9902f46d793f64848dedc75'
+    restart: no
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      INIT_KAFKA_BOOTSTRAP_SERVER: "kafka:29092"
+    command: [ '/opt/init.sh' ]
+    volumes:
+      - ./config/kafka_init/init.sh:/opt/init.sh:ro
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:v0.7.1
+    image: provectuslabs/kafka-ui:v0.7.2@sha256:8f2ff02d64b0a7a2b71b6b3b3148b85f66d00ec20ad40c30bdcd415d46d31818
     ports:
       - "18080:8080"
     depends_on:
