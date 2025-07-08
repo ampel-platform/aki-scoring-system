@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public interface PatientRepo {
 
-    Optional<Patient> findPatientById(String patientId);
+    Optional<Patient> findLatestPatientById(String patientId);
 
-    void upsertPatient(Patient patient);
+    void insertPatient(Patient patient);
 }

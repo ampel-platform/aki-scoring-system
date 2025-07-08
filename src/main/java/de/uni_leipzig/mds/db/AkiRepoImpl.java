@@ -2,8 +2,7 @@ package de.uni_leipzig.mds.db;
 
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
-import com.mongodb.client.model.FindOneAndReplaceOptions;
-import com.mongodb.client.model.ReturnDocument;
+import com.mongodb.client.model.Sorts;
 import de.uni_leipzig.mds.db.types.LaboratoryEntry;
 import de.uni_leipzig.mds.db.types.MedicalCase;
 import de.uni_leipzig.mds.db.types.Patient;
@@ -43,7 +42,7 @@ public final class AkiRepoImpl implements AkiRepo {
     @Override
     public void insertLaboratoryEntry(LaboratoryEntry laboratoryEntry) {
         requireNonNull(laboratoryEntry, "laboratoryEntry must not be null");
-        laboratoryCollection.insertOne(laboratoryEntry);
+        laboratoryCollection.insertOne(new LaboratoryEntry(laboratoryEntry, LocalDateTime.now()));
     }
 
     @Override
@@ -62,45 +61,36 @@ public final class AkiRepoImpl implements AkiRepo {
     }
 
     @Override
-    public Optional<MedicalCase> findMedicalCaseById(String medicalCaseId) {
+    public Optional<MedicalCase> findLatestMedicalCaseById(String medicalCaseId) {
         neitherNullNorBlank(medicalCaseId, "medical case id must neither be null nor blank");
 
         return Optional.ofNullable(
                 medicalCaseCollection.find(Filters.eq("_id", medicalCaseId))
+                        // sort by ingestion time
+                        .sort(Sorts.descending("_ingestionTime"))
                         .first());
     }
 
     @Override
-    public void upsertMedicalCase(MedicalCase medicalCase) {
+    public void insertMedicalCase(MedicalCase medicalCase) {
         requireNonNull(medicalCase, "medical case must not be null");
-
-        var filter = Filters.eq("_id", medicalCase.id());
-        var replaceOpts = new FindOneAndReplaceOptions()
-                .upsert(true)
-                .returnDocument(ReturnDocument.AFTER);
-
-        medicalCaseCollection.findOneAndReplace(filter, medicalCase, replaceOpts);
+        medicalCaseCollection.insertOne(new MedicalCase(medicalCase, LocalDateTime.now()));
     }
 
     @Override
-    public Optional<Patient> findPatientById(String patientId) {
+    public Optional<Patient> findLatestPatientById(String patientId) {
         neitherNullNorBlank(patientId, "patient di must neither be null nor blank");
 
         return Optional.ofNullable(
                 patientCollection.find(Filters.eq("_id", patientId))
+                        .sort(Sorts.descending("_ingestionTime"))
                         .first());
     }
 
     @Override
-    public void upsertPatient(Patient patient) {
+    public void insertPatient(Patient patient) {
         requireNonNull(patient, "patient must not be null");
-
-        var filter = Filters.eq("_id", patient.id());
-        var replaceOpts = new FindOneAndReplaceOptions()
-                .upsert(true)
-                .returnDocument(ReturnDocument.AFTER);
-
-        patientCollection.findOneAndReplace(filter, patient, replaceOpts);
+        patientCollection.insertOne(new Patient(patient, LocalDateTime.now()));
     }
 
     @Override
@@ -114,7 +104,7 @@ public final class AkiRepoImpl implements AkiRepo {
     @Override
     public void insertProcedure(Procedure procedure) {
         requireNonNull(procedure, "procedure must not be null");
-        procedureCollection.insertOne(procedure);
+        procedureCollection.insertOne(new Procedure(procedure, LocalDateTime.now()));
     }
 
     @Override

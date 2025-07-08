@@ -11,7 +11,6 @@ import de.uni_leipzig.mds.processing.context.WorkflowLabValue;
 import de.uni_leipzig.mds.processing.context.WorkflowMedicalCase;
 import de.uni_leipzig.mds.processing.context.WorkflowPatient;
 import de.uni_leipzig.mds.processing.context.WorkflowProcedure;
-import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,7 +63,6 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
         LOGGER.debug("inserting laboratory value with id `{}`", labMessagePayload.documentId());
         akiRepo.insertLaboratoryEntry(
                 new LaboratoryEntry(
-                        ObjectId.get(),
                         labMessagePayload.caseId(),
                         labMessagePayload.orderId(),
                         labMessagePayload.analyte(),
@@ -105,12 +103,12 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
     }
 
     private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId, String orderId) {
-        var medicalCase = akiRepo.findMedicalCaseById(caseId).orElse(null);
+        var medicalCase = akiRepo.findLatestMedicalCaseById(caseId).orElse(null);
         if (medicalCase == null) {
             LOGGER.warn("no associated medical case for laboratory order '{}'", orderId);
             return Optional.empty();
         }
-        var patient = akiRepo.findPatientById(medicalCase.patientIdRef()).orElse(null);
+        var patient = akiRepo.findLatestPatientById(medicalCase.patientIdRef()).orElse(null);
         if (patient == null) {
             LOGGER.warn("no associated patient for laboratory order '{}'", orderId);
             return Optional.empty();
@@ -142,11 +140,11 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
                 .toList();
 
         return Optional.of(new WorkflowMedicalCase(
-                medicalCase.id(),
+                medicalCase.medicalCaseId(),
                 medicalCase.creationDate(),
                 medicalCase.cancellationDate(),
                 new WorkflowPatient(
-                        patient.id(),
+                        patient.patientId(),
                         patient.dateOfBirth(),
                         patient.deceased(),
                         patient.dischargeTime()

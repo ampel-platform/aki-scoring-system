@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public interface MedicalCaseRepo {
 
-    Optional<MedicalCase> findMedicalCaseById(String medicalCaseId);
+    Optional<MedicalCase> findLatestMedicalCaseById(String medicalCaseId);
 
-    void upsertMedicalCase(MedicalCase medicalCase);
+    void insertMedicalCase(MedicalCase medicalCase);
 }

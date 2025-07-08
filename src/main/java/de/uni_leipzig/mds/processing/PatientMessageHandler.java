@@ -26,7 +26,7 @@ public final class PatientMessageHandler implements MessageHandler<PatientMessag
         var patientMessagePayload = message.body();
 
         LOGGER.debug("inserting patient with id `{}`", patientMessagePayload.patientId());
-        akiRepo.upsertPatient(
+        akiRepo.insertPatient(
                 new Patient(
                         patientMessagePayload.patientId(),
                         patientMessagePayload.dateOfBirth(),

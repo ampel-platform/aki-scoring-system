@@ -7,6 +7,7 @@ import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
+import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.TimeSeriesOptions;
 import de.uni_leipzig.mds.db.types.LaboratoryEntry;
 import de.uni_leipzig.mds.db.types.MedicalCase;
@@ -60,7 +61,7 @@ public final class RepositoryFactory {
 
     private static Optional<MongoCollection<LaboratoryEntry>> createLabValueCollection(MongoDatabase db) {
         var timeSeriesOpts = new TimeSeriesOptions("measuringTime")
-                .metaField("caseId");
+                .metaField("medicalCaseId");
 
         var timeSeriesCollectionOpts = new CreateCollectionOptions()
                 .timeSeriesOptions(timeSeriesOpts);
@@ -78,6 +79,8 @@ public final class RepositoryFactory {
 
     private static Optional<MongoCollection<MedicalCase>> createMedicalCaseCollection(MongoDatabase db) {
         db.createCollection(MEDICAL_CASE_COLLECTION_NAME);
+        db.getCollection(MEDICAL_CASE_COLLECTION_NAME)
+                .createIndex(Indexes.text("medicalCaseId"));
         return RepositoryFactoryUtil.getCollection(db, MEDICAL_CASE_COLLECTION_NAME, MedicalCase.class);
     }
 
@@ -90,6 +93,8 @@ public final class RepositoryFactory {
 
     private static Optional<MongoCollection<Patient>> createPatientCollection(MongoDatabase db) {
         db.createCollection(PATIENT_COLLECTION_NAME);
+        db.getCollection(PATIENT_COLLECTION_NAME)
+                .createIndex(Indexes.text("patientId"));
         return RepositoryFactoryUtil.getCollection(db, PATIENT_COLLECTION_NAME, Patient.class);
     }
 
@@ -102,7 +107,7 @@ public final class RepositoryFactory {
 
     private static Optional<MongoCollection<Procedure>> createProcedureCollection(MongoDatabase db) {
         var timeSeriesOpts = new TimeSeriesOptions("conductTime")
-                .metaField("caseId");
+                .metaField("medicalCaseId");
 
         var timeSeriesCollectionOpts = new CreateCollectionOptions()
                 .timeSeriesOptions(timeSeriesOpts);

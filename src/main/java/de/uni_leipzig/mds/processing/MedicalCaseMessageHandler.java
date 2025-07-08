@@ -26,7 +26,7 @@ public final class MedicalCaseMessageHandler implements MessageHandler<MedCaseMe
         var medicalCaseMessagePayload = message.body();
         LOGGER.debug("inserting medical case with id `{}`", medicalCaseMessagePayload.caseId());
 
-        akiRepo.upsertMedicalCase(
+        akiRepo.insertMedicalCase(
                 new MedicalCase(
                         medicalCaseMessagePayload.caseId(),
                         medicalCaseMessagePayload.patientId(),

@@ -4,7 +4,6 @@ import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
 import de.uni_leipzig.mds.db.AkiRepo;
 import de.uni_leipzig.mds.db.types.Procedure;
-import org.bson.types.ObjectId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,7 +43,6 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
         LOGGER.debug("inserting procedure with id `{}`", procedureMessagePayload.procedureId());
         akiRepo.insertProcedure(
                 new Procedure(
-                        ObjectId.get(),
                         procedureMessagePayload.caseId(),
                         procedureMessagePayload.procedureId(),
                         procedureMessagePayload.procedureCode(),
