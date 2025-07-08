@@ -8,5 +8,5 @@ public interface PatientRepo {
 
     Optional<Patient> findPatientById(String patientId);
 
-    Patient upsertPatient(Patient patient);
+    void upsertPatient(Patient patient);
 }

@@ -11,7 +11,6 @@ import de.uni_leipzig.mds.db.types.Procedure;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.stream.StreamSupport;
 
@@ -42,21 +41,9 @@ public final class AkiRepoImpl implements AkiRepo {
     }
 
     @Override
-    public LaboratoryEntry insertLaboratoryEntry(LaboratoryEntry laboratoryEntry) {
+    public void insertLaboratoryEntry(LaboratoryEntry laboratoryEntry) {
         requireNonNull(laboratoryEntry, "laboratoryEntry must not be null");
-        var res = laboratoryCollection.insertOne(laboratoryEntry);
-
-        try {
-            return StreamSupport.stream(laboratoryCollection
-                                    .find(Filters.eq("_id", res.getInsertedId()))
-                                    .spliterator(),
-                            false)
-                    .toList()
-                    .getFirst();
-        } catch (NoSuchElementException e) {
-            throw new RuntimeException("could not find inserted laboratory entry with id '%s'"
-                    .formatted(res.getInsertedId()));
-        }
+        laboratoryCollection.insertOne(laboratoryEntry);
     }
 
     @Override
@@ -84,7 +71,7 @@ public final class AkiRepoImpl implements AkiRepo {
     }
 
     @Override
-    public MedicalCase upsertMedicalCase(MedicalCase medicalCase) {
+    public void upsertMedicalCase(MedicalCase medicalCase) {
         requireNonNull(medicalCase, "medical case must not be null");
 
         var filter = Filters.eq("_id", medicalCase.id());
@@ -92,7 +79,7 @@ public final class AkiRepoImpl implements AkiRepo {
                 .upsert(true)
                 .returnDocument(ReturnDocument.AFTER);
 
-        return medicalCaseCollection.findOneAndReplace(filter, medicalCase, replaceOpts);
+        medicalCaseCollection.findOneAndReplace(filter, medicalCase, replaceOpts);
     }
 
     @Override
@@ -105,7 +92,7 @@ public final class AkiRepoImpl implements AkiRepo {
     }
 
     @Override
-    public Patient upsertPatient(Patient patient) {
+    public void upsertPatient(Patient patient) {
         requireNonNull(patient, "patient must not be null");
 
         var filter = Filters.eq("_id", patient.id());
@@ -113,7 +100,7 @@ public final class AkiRepoImpl implements AkiRepo {
                 .upsert(true)
                 .returnDocument(ReturnDocument.AFTER);
 
-        return patientCollection.findOneAndReplace(filter, patient, replaceOpts);
+        patientCollection.findOneAndReplace(filter, patient, replaceOpts);
     }
 
     @Override
@@ -125,21 +112,9 @@ public final class AkiRepoImpl implements AkiRepo {
     }
 
     @Override
-    public Procedure insertProcedure(Procedure procedure) {
+    public void insertProcedure(Procedure procedure) {
         requireNonNull(procedure, "procedure must not be null");
-        var res = procedureCollection.insertOne(procedure);
-
-        try {
-            return StreamSupport.stream(procedureCollection
-                                    .find(Filters.eq("_id", res.getInsertedId()))
-                                    .spliterator(),
-                            false)
-                    .toList()
-                    .getFirst();
-        } catch (NoSuchElementException e) {
-            throw new RuntimeException("could not find inserted procedure with id '%s'"
-                    .formatted(res.getInsertedId()));
-        }
+        procedureCollection.insertOne(procedure);
     }
 
     @Override

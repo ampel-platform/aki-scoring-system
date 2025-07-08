@@ -9,7 +9,7 @@ public interface ProcedureRepo {
 
     List<Procedure> findAllProceduresInMedicalCase(String medicalCaseId);
 
-    Procedure insertProcedure(Procedure procedure);
+    void insertProcedure(Procedure procedure);
 
     long deleteProceduresInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t);
 }

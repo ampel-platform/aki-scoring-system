@@ -8,5 +8,5 @@ public interface MedicalCaseRepo {
 
     Optional<MedicalCase> findMedicalCaseById(String medicalCaseId);
 
-    MedicalCase upsertMedicalCase(MedicalCase medicalCase);
+    void upsertMedicalCase(MedicalCase medicalCase);
 }

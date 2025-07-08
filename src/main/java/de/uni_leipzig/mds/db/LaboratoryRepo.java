@@ -9,7 +9,7 @@ public interface LaboratoryRepo {
 
     List<LaboratoryEntry> findAllLaboratoryEntriesInMedicalCase(String medicalCaseId);
 
-    LaboratoryEntry insertLaboratoryEntry(LaboratoryEntry laboratoryEntry);
+    void insertLaboratoryEntry(LaboratoryEntry laboratoryEntry);
 
     long deleteLaboratoryEntriesInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t);
 }
