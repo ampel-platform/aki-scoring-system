@@ -44,7 +44,7 @@ services:
       - ./config/kafka_init/init.sh:/opt/init.sh:ro
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:v0.7.1
+    image: provectuslabs/kafka-ui:v0.7.2@sha256:8f2ff02d64b0a7a2b71b6b3b3148b85f66d00ec20ad40c30bdcd415d46d31818
     ports:
       - "18080:8080"
     depends_on:
