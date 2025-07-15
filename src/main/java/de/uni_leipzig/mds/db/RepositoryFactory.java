@@ -9,7 +9,7 @@ import com.mongodb.client.MongoDatabase;
 import com.mongodb.client.model.CreateCollectionOptions;
 import com.mongodb.client.model.Indexes;
 import com.mongodb.client.model.TimeSeriesOptions;
-import de.uni_leipzig.mds.db.types.LaboratoryEntry;
+import de.uni_leipzig.mds.db.types.LaboratoryEvaluation;
 import de.uni_leipzig.mds.db.types.MedicalCase;
 import de.uni_leipzig.mds.db.types.Patient;
 import de.uni_leipzig.mds.db.types.Procedure;
@@ -28,46 +28,61 @@ import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
 public final class RepositoryFactory {
 
-    private static final String LABORATORY_COLLECTION_NAME = "laboratory";
-    private static final String MEDICAL_CASE_COLLECTION_NAME = "medicalcase";
+    private static final String LABORATORY_EVALUATION_COLLECTION_NAME = "laboratory-evaluation";
+    private static final String MEDICAL_CASE_COLLECTION_NAME = "medical-case";
     private static final String PATIENT_COLLECTION_NAME = "patient";
     private static final String PROCEDURE_COLLECTION_NAME = "procedure";
 
     private RepositoryFactory() {
     }
 
-    public static AkiRepo getInitializedAkiRepo(ConnectionString dbConnectionString) {
+
+    public static MongoClient getMongoClient(ConnectionString dbConnectionString) {
+        requireNonNull(dbConnectionString, "db connection string must not be null");
+        return RepositoryFactoryUtil.createDBClient(dbConnectionString);
+    }
+
+    public static MongoDatabase getMongoDatabase(ConnectionString dbConnectionString) {
         requireNonNull(dbConnectionString, "db connection string must not be null");
         if (dbConnectionString.getDatabase() == null) {
             throw new IllegalArgumentException("db connection string must include the database name");
         }
 
-        var dbClient = RepositoryFactoryUtil.createDBClient(dbConnectionString);
-        var db = dbClient.getDatabase(dbConnectionString.getDatabase());
+        return getMongoClient(dbConnectionString).getDatabase(dbConnectionString.getDatabase());
+    }
 
-        return new AkiRepoImpl(
-                getInitializedLaboratoryCollection(db),
-                getInitializedMedicalCaseCollection(db),
-                getInitializedPatientCollection(db),
-                getInitializedProcedureCollection(db));
+    public static PatientRepo getInitializedPatientRepo(MongoDatabase db) {
+        return new PatientRepo(getInitializedPatientCollection(db));
+    }
+
+    public static MedicalCaseRepo getInitializedMedicalCaseRepo(MongoDatabase db) {
+        return new MedicalCaseRepo(getInitializedMedicalCaseCollection(db));
+    }
+
+    public static LaboratoryEvaluationRepo getInitializedLaboratoryEvaluationRepo(MongoDatabase db) {
+        return new LaboratoryEvaluationRepo(getInitializedLaboratoryEvaluationCollection(db));
+    }
+
+    public static ProcedureRepo getInitializedProcedureRepo(MongoDatabase db) {
+        return new ProcedureRepo(getInitializedProcedureCollection(db));
     }
 
     // Laboratory ------------------------------------------------------------------------------------------------------
-    private static MongoCollection<LaboratoryEntry> getInitializedLaboratoryCollection(MongoDatabase db) {
-        return RepositoryFactoryUtil.getCollection(db, LABORATORY_COLLECTION_NAME, LaboratoryEntry.class)
+    private static MongoCollection<LaboratoryEvaluation> getInitializedLaboratoryEvaluationCollection(MongoDatabase db) {
+        return RepositoryFactoryUtil.getCollection(db, LABORATORY_EVALUATION_COLLECTION_NAME, LaboratoryEvaluation.class)
                 .or(() -> createLabValueCollection(db))
                 .orElseThrow(() -> new RuntimeException("cannot create lab value collection"));
     }
 
-    private static Optional<MongoCollection<LaboratoryEntry>> createLabValueCollection(MongoDatabase db) {
+    private static Optional<MongoCollection<LaboratoryEvaluation>> createLabValueCollection(MongoDatabase db) {
         var timeSeriesOpts = new TimeSeriesOptions("measuringTime")
                 .metaField("medicalCaseId");
 
         var timeSeriesCollectionOpts = new CreateCollectionOptions()
                 .timeSeriesOptions(timeSeriesOpts);
 
-        db.createCollection(LABORATORY_COLLECTION_NAME, timeSeriesCollectionOpts);
-        return RepositoryFactoryUtil.getCollection(db, LABORATORY_COLLECTION_NAME, LaboratoryEntry.class);
+        db.createCollection(LABORATORY_EVALUATION_COLLECTION_NAME, timeSeriesCollectionOpts);
+        return RepositoryFactoryUtil.getCollection(db, LABORATORY_EVALUATION_COLLECTION_NAME, LaboratoryEvaluation.class);
     }
 
     // Medical Case ----------------------------------------------------------------------------------------------------
@@ -130,7 +145,7 @@ public final class RepositoryFactory {
 
         private static CodecRegistry createMongoDBCodecRegistry() {
             var pojoCodecProvider = PojoCodecProvider.builder()
-                    .register(LaboratoryEntry.class, MedicalCase.class, Patient.class, Procedure.class)
+                    .register(LaboratoryEvaluation.class, MedicalCase.class, Patient.class, Procedure.class)
                     .conventions(List.of(Conventions.ANNOTATION_CONVENTION))
                     .build();
             var pojoCodecRegistry = fromProviders(pojoCodecProvider);

@@ -1,15 +1,43 @@
 package de.uni_leipzig.mds.db;
 
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.bulk.ClientNamespacedInsertOneModel;
+import com.mongodb.client.model.bulk.ClientNamespacedWriteModel;
 import de.uni_leipzig.mds.db.types.Procedure;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
-public interface ProcedureRepo {
+import static java.util.Objects.requireNonNull;
 
-    List<Procedure> findAllProceduresInMedicalCase(String medicalCaseId);
+public final class ProcedureRepo implements ProcedureReader, ProcedureWriter {
 
-    void insertProcedure(Procedure procedure);
+    private final MongoCollection<Procedure> procedureCollection;
 
-    long deleteProceduresInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t);
+    public ProcedureRepo(MongoCollection<Procedure> procedureCollection) {
+        this.procedureCollection = requireNonNull(procedureCollection, "procedure collection must not be null");
+    }
+
+    @Override
+    public List<Procedure> findAllProceduresInMedicalCase(String medicalCaseId) {
+        // TODO: implement
+        return List.of();
+    }
+
+    @Override
+    public ClientNamespacedInsertOneModel createInsertCommand(Procedure procedure) {
+        requireNonNull(procedure, "procedure must not be null");
+
+        return ClientNamespacedWriteModel.insertOne(
+                procedureCollection.getNamespace(),
+                new Procedure(procedure, LocalDateTime.now())
+        );
+    }
+
+    // TODO: rename to createDeletionCommandForProceduresInMedicalCaseOlderThan
+    @Override
+    public long deleteProceduresInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t) {
+        // TODO: implement
+        return 0;
+    }
 }

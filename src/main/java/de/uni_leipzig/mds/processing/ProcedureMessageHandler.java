@@ -2,7 +2,7 @@ package de.uni_leipzig.mds.processing;
 
 import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
-import de.uni_leipzig.mds.db.AkiRepo;
+import de.uni_leipzig.mds.db.MessagePersistenceHandler;
 import de.uni_leipzig.mds.db.types.Procedure;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,16 +22,15 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
      */
     private static final List<String> PROCEDURE_CODES_DIALYSIS = List.of("8-853", "8-854", "8-855", "8-857", "8-85A");
 
-    private final AkiRepo akiRepo;
+    private final MessagePersistenceHandler messagePersistenceHandler;
 
-    public ProcedureMessageHandler(AkiRepo akiRepo) {
-        this.akiRepo = requireNonNull(akiRepo, "aki repository must not be null");
+    public ProcedureMessageHandler(MessagePersistenceHandler messagePersistenceHandler) {
+        this.messagePersistenceHandler = requireNonNull(messagePersistenceHandler, "message persistence handler must not be null");
     }
 
     @Override
     public void handleMessage(Message<String, ProcedureMessage> message) {
         LOGGER.debug("received procedure message");
-
         var procedureMessagePayload = message.body();
 
         if (!isConsiderableProcedure().test(procedureMessagePayload)) {
@@ -41,13 +40,14 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
         }
 
         LOGGER.debug("inserting procedure with id `{}`", procedureMessagePayload.procedureId());
-        akiRepo.insertProcedure(
+        messagePersistenceHandler.writeProcedure(
                 new Procedure(
                         procedureMessagePayload.caseId(),
                         procedureMessagePayload.procedureId(),
                         procedureMessagePayload.procedureCode(),
                         procedureMessagePayload.performedOn(),
-                        procedureMessagePayload.cancellationDate()));
+                        procedureMessagePayload.cancellationDate())
+        );
     }
 
     private Predicate<ProcedureMessage> isConsiderableProcedure() {

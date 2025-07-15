@@ -9,6 +9,7 @@ import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
 import de.uni_leipzig.ampel.sdk.io.message.result.ResultMessage;
 import de.uni_leipzig.mds.db.DBConnectionSettings;
+import de.uni_leipzig.mds.db.MessagePersistenceHandler;
 import de.uni_leipzig.mds.db.RepositoryFactory;
 import de.uni_leipzig.mds.processing.*;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -20,6 +21,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import static java.lang.System.getenv;
 import static java.util.Objects.requireNonNull;
+import static java.util.Objects.requireNonNullElse;
 
 public class Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
@@ -30,8 +32,10 @@ public class Main {
         var mongoDBName = requireNonNull(getenv("MONGO_DB_NAME"), "MongoDB name must be specified");
         var kafkaBootstrapServers = requireNonNull(getenv("KAFKA_BOOTSTRAP_SERVERS"), "Kafka bootstrap servers must be specified");
         var kafkaConsumerGroupId = requireNonNull(getenv("KAFKA_CONSUMER_GROUP_ID"), "Kafka consumer group id must be specified");
-        var kafkaConsumerCommitTimeoutMs = requireNonNull(getenv("KAFKA_CONSUMER_COMMIT_TIMEOUT_MS"), "Kafka consumer commit " +
-                "timeout in ms must be specified");
+        var kafkaConsumerCommitTimeoutMs = Long.parseLong(requireNonNull(getenv("KAFKA_CONSUMER_COMMIT_TIMEOUT_MS"), "Kafka consumer commit " +
+                "timeout in ms must be specified"));
+        var messageBufferSize = Integer.parseInt(requireNonNullElse(getenv("MESSAGE_BUFFER_SIZE"), "100000"));
+        var persistenceFlushTimeoutMs = Long.parseLong(requireNonNullElse(getenv("MESSAGE_PERSISTENCE_FLUSH_TIMEOUT_MS"), "200"));
 
         var workflowTriggerQueue = new LinkedBlockingQueue<WorkflowTrigger>();
         var workflowResultQueue = new LinkedBlockingQueue<Message<String, ResultMessage>>();
@@ -45,29 +49,44 @@ public class Main {
 
         var sharedTopicReaderConfig = KafkaReaderConfig.builder()
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, kafkaConsumerGroupId)
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.ENABLE_AUTO_COMMIT, false)
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, Long.parseLong(kafkaConsumerCommitTimeoutMs))
+                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, kafkaConsumerCommitTimeoutMs)
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
                 .build();
 
 
         var dbConnSettings = new DBConnectionSettings(mongoDBHost, mongoDBPort, mongoDBName);
-        var akiRepo = RepositoryFactory.getInitializedAkiRepo(dbConnSettings.getConnectionString());
-        var workflowCleaner = new WorkflowCleaner(akiRepo);
+        var mongoClient = RepositoryFactory.getMongoClient(dbConnSettings.getConnectionString());
+        var mongoDatabase = RepositoryFactory.getMongoDatabase(dbConnSettings.getConnectionString());
 
-        var labMessageHandler = new LaboratoryMessageHandler(akiRepo, workflowTriggerQueue, workflowCleaner);
-        var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, kafkaBootstrapServers, sharedTopicReaderConfig,
-                labMessageHandler, LaboratoryMessage.class);
+        var patientRepo = RepositoryFactory.getInitializedPatientRepo(mongoDatabase);
+        var medicalCaseRepo = RepositoryFactory.getInitializedMedicalCaseRepo(mongoDatabase);
+        var labEvaluationRepo = RepositoryFactory.getInitializedLaboratoryEvaluationRepo(mongoDatabase);
+        var procedureRepo = RepositoryFactory.getInitializedProcedureRepo(mongoDatabase);
+//        var workflowCleaner = new WorkflowCleaner(akiRepo);
 
-        var medicalCaseMessageHandler = new MedicalCaseMessageHandler(akiRepo);
-        var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, kafkaBootstrapServers,
-                sharedTopicReaderConfig, medicalCaseMessageHandler, MedCaseMessage.class);
+        var messagePersistenceHandler = new MessagePersistenceHandler(
+                mongoClient,
+                medicalCaseRepo,
+                patientRepo,
+                labEvaluationRepo,
+                procedureRepo,
+                messageBufferSize,
+                persistenceFlushTimeoutMs
+        );
 
-        var patientMessageHandler = new PatientMessageHandler(akiRepo);
+        var patientMessageHandler = new PatientMessageHandler(messagePersistenceHandler);
         var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, kafkaBootstrapServers, sharedTopicReaderConfig,
                 patientMessageHandler, PatientMessage.class);
 
-        var procedureMessageHandler = new ProcedureMessageHandler(akiRepo);
+        var medicalCaseMessageHandler = new MedicalCaseMessageHandler(messagePersistenceHandler);
+        var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, kafkaBootstrapServers,
+                sharedTopicReaderConfig, medicalCaseMessageHandler, MedCaseMessage.class);
+
+        var labMessageHandler = new LaboratoryMessageHandler(messagePersistenceHandler);
+        var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, kafkaBootstrapServers, sharedTopicReaderConfig,
+                labMessageHandler, LaboratoryMessage.class);
+
+        var procedureMessageHandler = new ProcedureMessageHandler(messagePersistenceHandler);
         var procedureTopicReader = getTopicReader(KafkaTopics.PROCEDURES, kafkaBootstrapServers,
                 sharedTopicReaderConfig, procedureMessageHandler, ProcedureMessage.class);
 
