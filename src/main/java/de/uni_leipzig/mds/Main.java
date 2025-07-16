@@ -62,7 +62,10 @@ public class Main {
         var medicalCaseRepo = RepositoryFactory.getInitializedMedicalCaseRepo(mongoDatabase);
         var labEvaluationRepo = RepositoryFactory.getInitializedLaboratoryEvaluationRepo(mongoDatabase);
         var procedureRepo = RepositoryFactory.getInitializedProcedureRepo(mongoDatabase);
-//        var workflowCleaner = new WorkflowCleaner(akiRepo);
+
+        var workflowCleaner = new WorkflowCleaner(mongoClient, labEvaluationRepo, procedureRepo);
+        var workflowTriggerListener = new WorkflowTriggerListener(medicalCaseRepo, patientRepo, labEvaluationRepo,
+                procedureRepo, workflowCleaner, workflowTriggerQueue);
 
         var messagePersistenceHandler = new MessagePersistenceHandler(
                 mongoClient,
@@ -73,6 +76,8 @@ public class Main {
                 messageBufferSize,
                 persistenceFlushTimeoutMs
         );
+        messagePersistenceHandler.registerLabEvaluationPersistedProspect(
+                workflowTriggerListener::onLaboratoryEvaluationMessagesPersisted);
 
         var patientMessageHandler = new PatientMessageHandler(messagePersistenceHandler);
         var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, kafkaBootstrapServers, sharedTopicReaderConfig,

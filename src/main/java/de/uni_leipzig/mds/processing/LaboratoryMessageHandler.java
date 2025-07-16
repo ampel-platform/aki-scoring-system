@@ -19,12 +19,12 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
     /**
      * Codes that denote a creatinine value.
      */
-    private static final List<String> LAB_CODES_CREATININE = List.of("LCRE_S");
+    static final List<String> LAB_CODES_CREATININE = List.of("LCRE_S");
 
     /**
      * Codes that denote a vancomycin value.
      */
-    private static final List<String> LAB_CODES_VANCOMYCIN = List.of("VANC-K_S", "VANC-S_S", "VANC-T_S", "VANC-U_S");
+    static final List<String> LAB_CODES_VANCOMYCIN = List.of("VANC-K_S", "VANC-S_S", "VANC-T_S", "VANC-U_S");
 
     private final MessagePersistenceHandler messagePersistenceHandler;
 
@@ -77,93 +77,4 @@ public final class LaboratoryMessageHandler implements MessageHandler<Laboratory
     private Predicate<LaboratoryMessage> isResemblingVancomycinValue() {
         return (message) -> LAB_CODES_VANCOMYCIN.contains(message.analyte().toUpperCase());
     }
-
-//    private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId, String orderId) {
-//        var medicalCase = akiRepo.findLatestMedicalCaseById(caseId).orElse(null);
-//        if (medicalCase == null) {
-//            LOGGER.warn("no associated medical case for laboratory order '{}'", orderId);
-//            return Optional.empty();
-//        }
-//        var patient = akiRepo.findLatestPatientById(medicalCase.patientIdRef()).orElse(null);
-//        if (patient == null) {
-//            LOGGER.warn("no associated patient for laboratory order '{}'", orderId);
-//            return Optional.empty();
-//        }
-//        var labValues = akiRepo.findAllLaboratoryEntriesInMedicalCase(caseId)
-//                .stream().map(lv -> new WorkflowLabValue(
-//                        lv.orderId(),
-//                        lv.analyte(),
-//                        lv.analyteValue(),
-//                        lv.analyteUnit(),
-//                        lv.originatingSystem(),
-//                        lv.measuringTime()))
-//                .toList();
-//
-//        var creatinineValues = labValues.stream().filter(
-//                        lv -> LAB_CODES_CREATININE.contains(lv.analyte().toUpperCase()))
-//                .toList();
-//
-//        var vancomycinValues = labValues.stream().filter(
-//                        lv -> LAB_CODES_VANCOMYCIN.contains(lv.analyte().toUpperCase()))
-//                .toList();
-//
-//        var procedures = akiRepo.findAllProceduresInMedicalCase(caseId)
-//                .stream().map(proc -> new WorkflowProcedure(
-//                        proc.procedureId(),
-//                        proc.procedureCode(),
-//                        proc.conductTime(),
-//                        proc.cancellationTime()))
-//                .toList();
-//
-//        return Optional.of(new WorkflowMedicalCase(
-//                medicalCase.medicalCaseId(),
-//                medicalCase.creationDate(),
-//                medicalCase.cancellationDate(),
-//                new WorkflowPatient(
-//                        patient.patientId(),
-//                        patient.dateOfBirth(),
-//                        patient.deceased(),
-//                        patient.dischargeTime()
-//                ),
-//                creatinineValues,
-//                vancomycinValues,
-//                procedures
-//        ));
-//    }
-//
-//    private void triggerWorkflowRunWithCleanup(String medicalCaseId, String orderId,
-//                                               LocalDateTime oldestConsideredDateTime,
-//                                               LocalDateTime latestConsideredDateTime) {
-//        generateMedicalCaseForWorkflowRun(medicalCaseId, orderId)
-//                .map(mc -> mc.filterForValuesBetween(
-//                        oldestConsideredDateTime,
-//                        latestConsideredDateTime))
-//                .ifPresentOrElse(
-//                        (workflowMedicalCase) -> {
-//                            if (!workflowMedicalCase.isSufficientForWorkflowRun()) {
-//                                LOGGER.warn("skipping workflow run for order '{}' because required information is" +
-//                                        " still missing", orderId);
-//                            }
-//
-//                            var workflowInputParams = new Parameter()
-//                                    .set(MEDICAL_CASE_PARAM, workflowMedicalCase);
-//
-//                            var workflowContext = new Context();
-//                            workflowContext.registerScoringSystemResultListener(
-//                                    msg -> workflowCleaner
-//                                            .expireEntriesInMedicalCaseOlderThan(medicalCaseId,
-//                                                    oldestConsideredDateTime));
-//
-//                            LOGGER.info("triggering aki workflow due to registered creatinine value");
-//                            workflowTriggerQueue.add(new WorkflowTrigger(
-//                                    new PatientMedicalCaseIdentifier(workflowMedicalCase.patient().id(),
-//                                            workflowMedicalCase.caseId())
-//                                    , workflowContext
-//                                    , workflowInputParams));
-//                        },
-//                        () -> LOGGER.warn("skipping workflow run for order '{}' despite having registered a " +
-//                                "creatinine value because other information required by the workflow is " +
-//                                "still missing", orderId)
-//                );
-//    }
 }

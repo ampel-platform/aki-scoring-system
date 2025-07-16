@@ -10,14 +10,13 @@ import de.uni_leipzig.mds.db.types.Patient;
 import de.uni_leipzig.mds.db.types.Procedure;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.time.LocalDateTime;
+import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Consumer;
 
 import static java.util.Objects.requireNonNull;
 
@@ -34,6 +33,8 @@ public final class MessagePersistenceHandler {
     private final BlockingQueue<PendingCommand> pendingCommandsBuffer;
     private final int pendingCommandsBufferCapacity;
     private final Lock pendingCommandsBufferLock;
+
+    private final List<Consumer<List<LaboratoryEvaluation>>> labEvaluationPersistedProspects;
 
     public MessagePersistenceHandler(MongoClient mongoClient,
                                      MedicalCaseWriter medicalCaseWriter,
@@ -56,6 +57,8 @@ public final class MessagePersistenceHandler {
         pendingCommandsBufferCapacity = messageCapacity;
         pendingCommandsBufferLock = new ReentrantLock();
 
+        labEvaluationPersistedProspects = new LinkedList<>();
+
         if (persistenceTimeoutMs <= 0) {
             throw new IllegalArgumentException("persistence timeout (ms) must be greater than zero");
         }
@@ -69,6 +72,11 @@ public final class MessagePersistenceHandler {
                 },
                 0,
                 persistenceTimeoutMs);
+    }
+
+    public void registerLabEvaluationPersistedProspect(Consumer<List<LaboratoryEvaluation>> consumer) {
+        requireNonNull(consumer, "consumer must not be null");
+        labEvaluationPersistedProspects.add(consumer);
     }
 
     public void writePatient(Patient patient) {
@@ -148,17 +156,34 @@ public final class MessagePersistenceHandler {
                     result.getInsertedCount(),
                     result.getDeletedCount());
 
-//            notifyProspectsOfPersistedLaboratoryEvaluation(persistedLaboratoryEvaluationMessages);
+            var persistedLabMessages = pendingCommands.stream()
+                    .filter(pc -> pc.messageType.equals(MessageType.LABORATORY_EVALUATION))
+                    .map(pc -> (LaboratoryEvaluation) pc.message)
+                    .toList();
+
+            // This can be a blocking call since we are holding a lock anyway
+            // However, would still be beneficial if it was a rather fast operation.
+            notifyProspectsOfPersistedLaboratoryEvaluation(persistedLabMessages);
         } catch (ClientBulkWriteException e) {
             log.error("error while writing patients", e);
+            // TODO: put messages back to the buffer if an error occurs - for retry purposes!
             throw new RuntimeException(e);
         } finally {
             pendingCommandsBufferLock.unlock();
         }
     }
 
-    private void notifyProspectsOfPersistedLaboratoryEvaluation() {
-        log.info("notifying prospects");
+    private void notifyProspectsOfPersistedLaboratoryEvaluation(
+            List<LaboratoryEvaluation> persistedLabEvaluationMessages) {
+        if (labEvaluationPersistedProspects.isEmpty()) {
+            log.debug("no registered prospects for persisted laboratory evaluation messages - skipping notifications");
+            return;
+        }
+
+        log.info("notifying #{} prospects", labEvaluationPersistedProspects.size());
+        for (Consumer<List<LaboratoryEvaluation>> prospect : labEvaluationPersistedProspects) {
+            prospect.accept(persistedLabEvaluationMessages);
+        }
     }
 
     private enum MessageType {
