@@ -95,7 +95,7 @@ public final class RepositoryFactory {
     private static Optional<MongoCollection<MedicalCase>> createMedicalCaseCollection(MongoDatabase db) {
         db.createCollection(MEDICAL_CASE_COLLECTION_NAME);
         db.getCollection(MEDICAL_CASE_COLLECTION_NAME)
-                .createIndex(Indexes.text("medicalCaseId"));
+                .createIndex(Indexes.descending("medicalCaseId", "_ingestionTime"));
         return RepositoryFactoryUtil.getCollection(db, MEDICAL_CASE_COLLECTION_NAME, MedicalCase.class);
     }
 
@@ -109,7 +109,7 @@ public final class RepositoryFactory {
     private static Optional<MongoCollection<Patient>> createPatientCollection(MongoDatabase db) {
         db.createCollection(PATIENT_COLLECTION_NAME);
         db.getCollection(PATIENT_COLLECTION_NAME)
-                .createIndex(Indexes.text("patientId"));
+                .createIndex(Indexes.descending("patientId", "_ingestionTime"));
         return RepositoryFactoryUtil.getCollection(db, PATIENT_COLLECTION_NAME, Patient.class);
     }
 
