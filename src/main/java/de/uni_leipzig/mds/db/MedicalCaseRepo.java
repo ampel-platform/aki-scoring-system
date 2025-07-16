@@ -5,7 +5,6 @@ import com.mongodb.client.model.bulk.ClientNamespacedInsertOneModel;
 import com.mongodb.client.model.bulk.ClientNamespacedWriteModel;
 import de.uni_leipzig.mds.db.types.MedicalCase;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static de.uni_leipzig.mds.util.PreconditionChecks.neitherNullNorBlank;
@@ -32,7 +31,7 @@ public final class MedicalCaseRepo implements MedicalCaseReader, MedicalCaseWrit
     public ClientNamespacedInsertOneModel createInsertCommand(MedicalCase medicalCase) {
         return ClientNamespacedWriteModel.insertOne(
                 medicalCaseCollection.getNamespace(),
-                new MedicalCase(medicalCase, LocalDateTime.now())
+                medicalCase
         );
     }
 }

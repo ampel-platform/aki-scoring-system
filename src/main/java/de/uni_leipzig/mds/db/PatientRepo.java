@@ -7,7 +7,6 @@ import com.mongodb.client.model.bulk.ClientNamespacedInsertOneModel;
 import com.mongodb.client.model.bulk.ClientNamespacedWriteModel;
 import de.uni_leipzig.mds.db.types.Patient;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 import static de.uni_leipzig.mds.util.PreconditionChecks.neitherNullNorBlank;
@@ -37,7 +36,7 @@ public final class PatientRepo implements PatientReader, PatientWriter {
 
         return ClientNamespacedWriteModel.insertOne(
                 patientCollection.getNamespace(),
-                new Patient(patient, LocalDateTime.now())
+                patient
         );
     }
 }

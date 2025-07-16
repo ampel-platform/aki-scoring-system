@@ -31,7 +31,7 @@ public final class MessagePersistenceHandler {
     private final LaboratoryEvaluationWriter laboratoryEvaluationWriter;
     private final ProcedureWriter procedureWriter;
 
-    private final BlockingQueue<Map.Entry<MessageType, ClientNamespacedWriteModel>> pendingCommandsBuffer;
+    private final BlockingQueue<PendingCommand> pendingCommandsBuffer;
     private final int pendingCommandsBufferCapacity;
     private final Lock pendingCommandsBufferLock;
 
@@ -73,10 +73,13 @@ public final class MessagePersistenceHandler {
 
     public void writePatient(Patient patient) {
         log.debug("defer persisting information for patient with ID `{}`", patient.patientId());
+        var patientWithIngestionTime = new Patient(patient, LocalDateTime.now());
         try {
-            pendingCommandsBuffer.put(Map.entry(
+            pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.PATIENT,
                     patientWriter.createInsertCommand(patient)));
+                    patientWriter.createInsertCommand(patientWithIngestionTime),
+                    patientWithIngestionTime));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -84,10 +87,12 @@ public final class MessagePersistenceHandler {
 
     public void writeMedicalCase(MedicalCase medicalCase) {
         log.debug("defer persisting information for medical case with ID `{}`", medicalCase.medicalCaseId());
+        var medicalCaseWithIngestionTime = new MedicalCase(medicalCase, LocalDateTime.now());
         try {
-            pendingCommandsBuffer.put(Map.entry(
+            pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.MEDICAL_CASE,
-                    medicalCaseWriter.createInsertCommand(medicalCase)));
+                    medicalCaseWriter.createInsertCommand(medicalCaseWithIngestionTime),
+                    medicalCaseWithIngestionTime));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -96,10 +101,13 @@ public final class MessagePersistenceHandler {
     public void writeLaboratoryEvaluation(LaboratoryEvaluation laboratoryEvaluation) {
         log.debug("defer persisting information for laboratory evaluation with order ID `{}`",
                 laboratoryEvaluation.orderId());
+        var laboratoryEvaluationWithIngestionTime = new LaboratoryEvaluation(laboratoryEvaluation,
+                LocalDateTime.now());
         try {
-            pendingCommandsBuffer.put(Map.entry(
+            pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.LABORATORY_EVALUATION,
-                    laboratoryEvaluationWriter.createInsertCommand(laboratoryEvaluation)));
+                    laboratoryEvaluationWriter.createInsertCommand(laboratoryEvaluationWithIngestionTime),
+                    laboratoryEvaluationWithIngestionTime));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -107,10 +115,12 @@ public final class MessagePersistenceHandler {
 
     public void writeProcedure(Procedure procedure) {
         log.debug("defer persisting information for procedure with ID `{}`", procedure.procedureId());
+        var procedureWithIngestionTime = new Procedure(procedure, LocalDateTime.now());
         try {
-            pendingCommandsBuffer.put(Map.entry(
+            pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.PROCEDURE,
-                    procedureWriter.createInsertCommand(procedure)));
+                    procedureWriter.createInsertCommand(procedureWithIngestionTime),
+                    procedureWithIngestionTime));
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -121,21 +131,20 @@ public final class MessagePersistenceHandler {
         // takes longer than the timer is configured to wait before triggering this function
         pendingCommandsBufferLock.lock();
         try {
-            var pendingCommandsByMessageType = new ArrayList<Map.Entry<MessageType, ClientNamespacedWriteModel>>
-                    (pendingCommandsBufferCapacity);
-            pendingCommandsBuffer.drainTo(pendingCommandsByMessageType, pendingCommandsBufferCapacity);
+            var pendingCommands = new ArrayList<PendingCommand>(pendingCommandsBufferCapacity);
+            pendingCommandsBuffer.drainTo(pendingCommands, pendingCommandsBufferCapacity);
 
-            if (pendingCommandsByMessageType.isEmpty()) {
+            if (pendingCommands.isEmpty()) {
                 log.debug("no commands to persist - skipping persisting step");
                 return;
             }
 
-            var pendingCommands = pendingCommandsByMessageType.stream()
-                    .map(Map.Entry::getValue)
+            var commandModels = pendingCommands.stream()
+                    .map(pc -> pc.writeModel)
                     .toList();
 
-            log.debug("persisting #{} elements", pendingCommandsByMessageType.size());
-            var result = mongoClient.bulkWrite(pendingCommands, new ConcreteClientBulkWriteOptions().ordered(true));
+            log.debug("persisting #{} elements", pendingCommands.size());
+            var result = mongoClient.bulkWrite(commandModels, new ConcreteClientBulkWriteOptions().ordered(true));
             log.info("persistence stats: #{} inserted | #{} deleted",
                     result.getInsertedCount(),
                     result.getDeletedCount());
@@ -160,8 +169,10 @@ public final class MessagePersistenceHandler {
         PROCEDURE
     }
 
-    public record LaboratoryEvaluationPersistedNotification(
-
+    private record PendingCommand(
+            MessageType messageType,
+            ClientNamespacedWriteModel writeModel,
+            Object message
     ) {
     }
 }

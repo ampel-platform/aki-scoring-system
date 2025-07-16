@@ -30,7 +30,7 @@ public final class ProcedureRepo implements ProcedureReader, ProcedureWriter {
 
         return ClientNamespacedWriteModel.insertOne(
                 procedureCollection.getNamespace(),
-                new Procedure(procedure, LocalDateTime.now())
+                procedure
         );
     }
 

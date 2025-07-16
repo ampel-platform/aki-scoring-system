@@ -31,7 +31,7 @@ public final class LaboratoryEvaluationRepo implements LaboratoryEvaluationReade
 
         return ClientNamespacedWriteModel.insertOne(
                 laboratoryEvaluationCollection.getNamespace(),
-                new LaboratoryEvaluation(laboratoryEvaluation, LocalDateTime.now())
+                laboratoryEvaluation
         );
     }
 
