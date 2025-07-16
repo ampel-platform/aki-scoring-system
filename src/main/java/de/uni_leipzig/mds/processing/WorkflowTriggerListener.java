@@ -74,6 +74,7 @@ public final class WorkflowTriggerListener {
 
     private Optional<WorkflowMedicalCase> generateMedicalCaseForWorkflowRun(String caseId, String orderId) {
         var startMedical = Instant.now();
+        // TODO: this is wrong as the patient information from the time of the laboratory evaluation entry needs to be found!
         var medicalCase = medicalCaseReader.findLatestMedicalCaseById(caseId).orElse(null);
         var endMedical = Instant.now();
         if (medicalCase == null) {
@@ -82,6 +83,7 @@ public final class WorkflowTriggerListener {
         }
 
         var startPatient = Instant.now();
+        // TODO: this is wrong as the patient information from the time of the laboratory evaluation entry needs to be found!
         var patient = patientReader.findLatestPatientById(medicalCase.patientIdRef()).orElse(null);
         var endPatient = Instant.now();
         if (patient == null) {
