@@ -2,7 +2,7 @@ package de.uni_leipzig.mds.processing;
 
 import de.uni_leipzig.ampel.sdk.io.message.Message;
 import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
-import de.uni_leipzig.mds.db.AkiRepo;
+import de.uni_leipzig.mds.db.MessagePersistenceHandler;
 import de.uni_leipzig.mds.db.types.MedicalCase;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,19 +14,19 @@ public final class MedicalCaseMessageHandler implements MessageHandler<MedCaseMe
 
     private static final Logger LOGGER = LoggerFactory.getLogger(MedicalCaseMessageHandler.class);
 
-    private final AkiRepo akiRepo;
+    private final MessagePersistenceHandler messagePersistenceHandler;
 
-    public MedicalCaseMessageHandler(AkiRepo akiRepo) {
-        this.akiRepo = requireNonNull(akiRepo, "aki repository must not be null");
+    public MedicalCaseMessageHandler(MessagePersistenceHandler messagePersistenceHandler) {
+        this.messagePersistenceHandler = requireNonNull(messagePersistenceHandler, "message persistence handler must not be null");
     }
 
     @Override
     public void handleMessage(Message<String, MedCaseMessage> message) {
         LOGGER.debug("received medical case message");
         var medicalCaseMessagePayload = message.body();
-        LOGGER.debug("inserting medical case with id `{}`", medicalCaseMessagePayload.caseId());
 
-        akiRepo.upsertMedicalCase(
+        LOGGER.debug("inserting medical case with id `{}`", medicalCaseMessagePayload.caseId());
+        messagePersistenceHandler.writeMedicalCase(
                 new MedicalCase(
                         medicalCaseMessagePayload.caseId(),
                         medicalCaseMessagePayload.patientId(),
