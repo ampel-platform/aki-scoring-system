@@ -1,5 +1,6 @@
 package de.uni_leipzig.mds.db;
 
+import com.mongodb.client.model.bulk.ClientNamespacedDeleteManyModel;
 import com.mongodb.client.model.bulk.ClientNamespacedInsertOneModel;
 import de.uni_leipzig.mds.db.types.Procedure;
 
@@ -9,5 +10,6 @@ public interface ProcedureWriter {
 
     ClientNamespacedInsertOneModel createInsertCommand(Procedure procedure);
 
-    long deleteProceduresInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t);
+    ClientNamespacedDeleteManyModel createDeleteCommandForProceduresInMedicalCaseOlderThan(
+            String medicalCaseId, LocalDateTime t);
 }

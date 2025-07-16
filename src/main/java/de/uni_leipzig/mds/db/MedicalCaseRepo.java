@@ -1,6 +1,8 @@
 package de.uni_leipzig.mds.db;
 
 import com.mongodb.client.MongoCollection;
+import com.mongodb.client.model.Filters;
+import com.mongodb.client.model.Sorts;
 import com.mongodb.client.model.bulk.ClientNamespacedInsertOneModel;
 import com.mongodb.client.model.bulk.ClientNamespacedWriteModel;
 import de.uni_leipzig.mds.db.types.MedicalCase;
@@ -21,10 +23,13 @@ public final class MedicalCaseRepo implements MedicalCaseReader, MedicalCaseWrit
 
     @Override
     public Optional<MedicalCase> findLatestMedicalCaseById(String medicalCaseId) {
-        neitherNullNorBlank(medicalCaseId, "medical case ID must neither be null nor blank");
+        neitherNullNorBlank(medicalCaseId, "medical case id must neither be null nor blank");
 
-        // TODO: implement
-        return Optional.empty();
+        return Optional.ofNullable(
+                medicalCaseCollection.find(Filters.eq("medicalCaseId", medicalCaseId))
+                        // sort by ingestion time
+                        .sort(Sorts.descending("_ingestionTime"))
+                        .first());
     }
 
     @Override

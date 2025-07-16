@@ -77,7 +77,6 @@ public final class MessagePersistenceHandler {
         try {
             pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.PATIENT,
-                    patientWriter.createInsertCommand(patient)));
                     patientWriter.createInsertCommand(patientWithIngestionTime),
                     patientWithIngestionTime));
         } catch (InterruptedException e) {

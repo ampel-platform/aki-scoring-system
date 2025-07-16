@@ -25,7 +25,7 @@ public final class PatientRepo implements PatientReader, PatientWriter {
         neitherNullNorBlank(patientId, "patient ID must neither be null nor blank");
 
         return Optional.ofNullable(
-                patientCollection.find(Filters.eq("_id", patientId))
+                patientCollection.find(Filters.eq("patientId", patientId))
                         .sort(Sorts.descending("_ingestionTime"))
                         .first());
     }
