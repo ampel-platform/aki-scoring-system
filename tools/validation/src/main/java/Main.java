@@ -222,7 +222,6 @@ public class Main {
         // READING BACK RESULTS
         var resultReaderCfg = KafkaReaderConfig.builder()
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, "aki-validation-result")
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.ENABLE_AUTO_COMMIT, false)
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, 5000L)
                 .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
                 .build();
