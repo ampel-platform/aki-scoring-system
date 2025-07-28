@@ -12,13 +12,15 @@ import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
 import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
 import de.uni_leipzig.ampel.sdk.io.message.result.ResultMessage;
+import lombok.NonNull;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 import util.PreProcessingUtil;
 
+import java.io.FileNotFoundException;
 import java.io.FileReader;
-import java.io.IOException;
+import java.io.InputStreamReader;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
@@ -33,27 +35,31 @@ import static java.util.Objects.requireNonNull;
 @Slf4j
 public class Main {
 
-    public static void main(String[] args) throws IOException, InterruptedException {
+    public static void main(String[] args) throws InterruptedException {
         var kafkaBootstrapServers = requireNonNull(getenv("KAFKA_BOOTSTRAP_SERVERS"), "kafka bootstrap servers must be specified");
-        var patientDataSource = requireNonNull(getenv("PATIENT_DATA_SOURCE"), "patient data source must be specified");
-        var medCaseDataSource = requireNonNull(getenv("MED_CASE_DATA_SOURCE"), "medical case data source must be specified");
-        var procedureDataSource = requireNonNull(getenv("PROCEDURE_DATA_SOURCE"), "procedure data source must be specified");
-        var labDataSource = requireNonNull(getenv("LABORATORY_DATA_SOURCE"), "lab data source must be specified");
-        var expectedResultsSource = requireNonNull(getenv("EXPECTED_RESULTS_SOURCE"), "expected results data source must be specified");
+        var patients = CsvToBeanFactory.getCsvToBeanTransformer(
+                        readDataOrUseBundledTestdata(getenv("PATIENT_DATA_SOURCE"), "testdata/patients.csv"),
+                        PatientData.class)
+                .parse();
+        var medicalCases = CsvToBeanFactory.getCsvToBeanTransformer(
+                        readDataOrUseBundledTestdata(getenv("MED_CASE_DATA_SOURCE"), "testdata/medical-cases.csv"),
+                        MedicalCaseData.class)
+                .parse();
+        var procedures = CsvToBeanFactory.getCsvToBeanTransformer(
+                        readDataOrUseBundledTestdata(getenv("PROCEDURE_DATA_SOURCE"), "testdata/procedures.csv"),
+                        ProcedureData.class)
+                .parse();
+        var labEvaluationData = CsvToBeanFactory.getCsvToBeanTransformer(
+                        readDataOrUseBundledTestdata(getenv("LABORATORY_DATA_SOURCE"), "testdata/laboratory-evaluations.csv"),
+                        LaboratoryData.class)
+                .parse();
+        var expectedResults = CsvToBeanFactory.getCsvToBeanTransformer(
+                        readDataOrUseBundledTestdata(getenv("EXPECTED_RESULTS_SOURCE"), "testdata/expected-results.csv"),
+                        OutputData.class)
+                .parse();
 
-        var patients = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(patientDataSource),
-                PatientData.class).parse();
-        var medicalCases = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(medCaseDataSource),
-                MedicalCaseData.class).parse();
-        var procedures = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(procedureDataSource),
-                ProcedureData.class).parse();
-        var labData = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(labDataSource),
-                LaboratoryData.class).parse();
-        var expectedResults = CsvToBeanFactory.getCsvToBeanTransformer(new FileReader(expectedResultsSource),
-                OutputData.class).parse();
-
-        var labEntriesWithNaNValues = PreProcessingUtil.getLabEntriesWithNaNValues(labData);
-        labData.removeAll(labEntriesWithNaNValues);
+        var labEntriesWithNaNValues = PreProcessingUtil.getLabEntriesWithNaNValues(labEvaluationData);
+        labEvaluationData.removeAll(labEntriesWithNaNValues);
 
         // Using this as a sort of multimap due to the fact that some timestamps may occur several times
         var timeBasedUploadFunctions = new HashMap<LocalDateTime, List<Callable<Void>>>(); // used for sorting
@@ -134,7 +140,7 @@ public class Main {
 
         // LABORATORY
         var laboratoryMessageQueue = new LinkedBlockingQueue<Message<String, LaboratoryMessage>>();
-        labData.forEach(lab -> {
+        labEvaluationData.forEach(lab -> {
             var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(lab.getMeasuredAt(),
                     new ArrayList<>());
 
@@ -269,9 +275,10 @@ public class Main {
         for (Map.Entry<String, Integer> cats : categories.entrySet()) {
             log.info("category {} - #entries: {}", cats.getKey(), cats.getValue());
         }
-        
+
         // categorize expectedResults
-        var relevantExpectedResults = PreProcessingUtil.filterResultsForOrdersOfExistingLabEntries(expectedResults, labData);
+        var relevantExpectedResults = PreProcessingUtil.filterResultsForOrdersOfExistingLabEntries(expectedResults,
+                labEvaluationData);
         log.info("relevant expected results: #{}", relevantExpectedResults.size());
         var orderIdResultMapping = relevantExpectedResults.stream()
                 .collect(
@@ -318,6 +325,29 @@ public class Main {
         }
 
         System.exit(0);
+    }
+
+    private static InputStreamReader readDataOrUseBundledTestdata(
+            String path,
+            @NonNull String bundledFallbackResourcePath) {
+        return Optional.ofNullable(path)
+                .map(s -> {
+                    try {
+                        return (InputStreamReader) new FileReader(s);
+                    } catch (FileNotFoundException e) {
+                        log.error("could not open file {}", s, e);
+                        System.exit(1);
+                    }
+                    return null;
+                })
+                .orElseGet(() -> {
+                    var bundledResource = Main.class.getClassLoader().getResourceAsStream(bundledFallbackResourcePath);
+                    if (bundledResource == null) {
+                        log.error("could not locate bundled resource at {}", bundledFallbackResourcePath);
+                        System.exit(1);
+                    }
+                    return new InputStreamReader(bundledResource);
+                });
     }
 
     private static TimerTask createCountdownTask(CountDownLatch latch) {
