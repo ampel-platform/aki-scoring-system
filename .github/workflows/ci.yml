@@ -59,6 +59,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          lfs: 'true'
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -86,7 +88,7 @@ jobs:
     needs: [ build-scoring-system, test-scoring-system, build-validation-tool ]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
@@ -95,13 +97,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scoring-system-packaged
-          path: ./target/*jar-with-dependencies.jar
+          path: ./target/
 
       - name: Download Validation Build Artifact
         uses: actions/download-artifact@v4
         with:
           name: validation-packaged
-          path: ./tools/validation/target/*jar-with-dependencies.jar
+          path: ./tools/validation/target/
 
       - name: Docker meta
         id: meta
@@ -116,6 +118,16 @@ jobs:
           echo "REPOSITORY=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
           echo "REPOSITORY_VALIDATION=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')-validation" >> "$GITHUB_OUTPUT"
           echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          
+          case "${GITHUB_REF#refs/tags/v}" in
+            *[rR][cC]* )
+              echo "PRERELEASE=true" >> "$GITHUB_OUTPUT"
+              ;;
+          
+            * )
+              echo "PRERELEASE=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
 
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v3
@@ -130,7 +142,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image for validation
+      - name: Build and push Docker image for scoring system
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -138,9 +150,10 @@ jobs:
           tags: |
             ghcr.io/${{ steps.release-prep.outputs.REPOSITORY }}:${{ steps.release-prep.outputs.VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
+          file: ./docker/Dockerfile
           push: true
 
-      - name: Build and push Docker image for scoring system
+      - name: Build and push Docker image for validation
         uses: docker/build-push-action@v5
         with:
           context: ./tools/validation/
@@ -161,6 +174,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: false
+          prerelease: ${{ steps.release-prep.outputs.PRERELEASE }}
           files: /tmp/release-assets/docker-compose-validation.yml
 
 
