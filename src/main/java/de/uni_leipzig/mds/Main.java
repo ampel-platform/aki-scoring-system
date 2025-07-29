@@ -17,6 +17,7 @@ import org.apache.kafka.common.serialization.StringSerializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static java.lang.System.getenv;
@@ -26,7 +27,7 @@ import static java.util.Objects.requireNonNullElse;
 public class Main {
     private static final Logger LOGGER = LoggerFactory.getLogger(Main.class);
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         var mongoDBHost = requireNonNull(getenv("MONGO_DB_HOST"), "MongoDB host must be specified");
         var mongoDBPort = requireNonNull(getenv("MONGO_DB_PORT"), "MongoDB port must be specified");
         var mongoDBName = requireNonNull(getenv("MONGO_DB_NAME"), "MongoDB name must be specified");
@@ -37,12 +38,21 @@ public class Main {
         var messageBufferSize = Integer.parseInt(requireNonNullElse(getenv("MESSAGE_BUFFER_SIZE"), "100000"));
         var persistenceFlushTimeoutMs = Long.parseLong(requireNonNullElse(getenv("MESSAGE_PERSISTENCE_FLUSH_TIMEOUT_MS"), "200"));
 
+        var scoringSystemMetaInformation = MetaInformation.readFromPropertyStream(
+                Main.class.getClassLoader().getResourceAsStream("app.properties"));
+
+
         var workflowTriggerQueue = new LinkedBlockingQueue<WorkflowTrigger>();
         var workflowResultQueue = new LinkedBlockingQueue<Message<String, ResultMessage>>();
         var workflowManager = new Thread(new WorkflowManager(
                 workflowTriggerQueue,
                 workflowResultQueue,
-                WorkflowFactory.createAkiWorkflow(),
+                WorkflowFactory.createAkiWorkflow(
+                        scoringSystemMetaInformation.getProperty(MetaInformationProperty.NAME)
+                                .orElse("AKI"),
+                        scoringSystemMetaInformation.getProperty(MetaInformationProperty.VERSION)
+                                .orElse("latest")
+                ),
                 WorkflowScheduler.createVirtualWorkflowScheduler()
         ));
 
