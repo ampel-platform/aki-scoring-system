@@ -95,13 +95,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: scoring-system-packaged
-          path: ./target/*jar-with-dependencies.jar
+          path: ./target/
 
       - name: Download Validation Build Artifact
         uses: actions/download-artifact@v4
         with:
           name: validation-packaged
-          path: ./tools/validation/target/*jar-with-dependencies.jar
+          path: ./tools/validation/target/
 
       - name: Docker meta
         id: meta
