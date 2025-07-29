@@ -130,7 +130,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image for validation
+      - name: Build and push Docker image for scoring system
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -138,9 +138,10 @@ jobs:
           tags: |
             ghcr.io/${{ steps.release-prep.outputs.REPOSITORY }}:${{ steps.release-prep.outputs.VERSION }}
           labels: ${{ steps.meta.outputs.labels }}
+          file: ./docker/Dockerfile
           push: true
 
-      - name: Build and push Docker image for scoring system
+      - name: Build and push Docker image for validation
         uses: docker/build-push-action@v5
         with:
           context: ./tools/validation/
