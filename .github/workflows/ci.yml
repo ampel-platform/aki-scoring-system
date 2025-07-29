@@ -1,0 +1,180 @@
+name: CI
+
+on:
+  push:
+    branches: [ "**" ]
+    tags: [ "v[0-9]+.[0-9]+.[0-9]+**" ]
+  pull_request:
+    branches: [ "develop" ]
+
+jobs:
+  build-scoring-system:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: maven
+
+      - uses: s4u/maven-settings-action@v3.0.0
+        with:
+          servers: |
+            [{"id": "ampel", "username": "${{ github.actor }}", "password": "${{ secrets.AMPEL_CDSS_ORG_PRIVATE_PACKAGE_ACCESS_TOKEN }}"}]
+
+      - name: Build
+        run: mvn --batch-mode --update-snapshots -DskipTests package
+
+      - name: Archive Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: scoring-system-packaged
+          path: ./target/*jar-with-dependencies.jar
+
+
+  test-scoring-system:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: maven
+
+      - uses: s4u/maven-settings-action@v3.0.0
+        with:
+          servers: |
+            [{"id": "ampel", "username": "${{ github.actor }}", "password": "${{ secrets.AMPEL_CDSS_ORG_PRIVATE_PACKAGE_ACCESS_TOKEN }}"}]
+
+      - name: Run Tests
+        run: mvn --batch-mode --update-snapshots test
+
+  build-validation-tool:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: 'true'
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+          cache: maven
+
+      - uses: s4u/maven-settings-action@v3.0.0
+        with:
+          servers: |
+            [{"id": "ampel", "username": "${{ github.actor }}", "password": "${{ secrets.AMPEL_CDSS_ORG_PRIVATE_PACKAGE_ACCESS_TOKEN }}"}]
+
+      - name: Build
+        run: mvn --batch-mode --update-snapshots -f ./tools/validation/pom.xml -DskipTests package
+
+      - name: Archive Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: validation-packaged
+          path: ./tools/validation/target/*jar-with-dependencies.jar
+
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+    needs: [ build-scoring-system, test-scoring-system, build-validation-tool ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Scoring System Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: scoring-system-packaged
+          path: ./target/
+
+      - name: Download Validation Build Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: validation-packaged
+          path: ./tools/validation/target/
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+
+      - name: Release Info Preparation
+        id: release-prep
+        run: |
+          echo "REPOSITORY=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+          echo "REPOSITORY_VALIDATION=$(echo $GITHUB_REPOSITORY | tr '[:upper:]' '[:lower:]')-validation" >> "$GITHUB_OUTPUT"
+          echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
+          
+          case "${GITHUB_REF#refs/tags/v}" in
+            *[rR][cC]* )
+              echo "PRERELEASE=true" >> "$GITHUB_OUTPUT"
+              ;;
+          
+            * )
+              echo "PRERELEASE=false" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image for scoring system
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ steps.release-prep.outputs.REPOSITORY }}:${{ steps.release-prep.outputs.VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
+          file: ./docker/Dockerfile
+          push: true
+
+      - name: Build and push Docker image for validation
+        uses: docker/build-push-action@v5
+        with:
+          context: ./tools/validation/
+          platforms: linux/amd64,linux/arm64
+          tags: |
+            ghcr.io/${{ steps.release-prep.outputs.REPOSITORY_VALIDATION }}:${{ steps.release-prep.outputs.VERSION }}
+          labels: ${{ steps.meta.outputs.labels }}
+          push: true
+
+      - name: Prepare Asset Directory
+        run: mkdir -p /tmp/release-assets
+
+      - name: Prepare Validation Docker Compose Asset
+        run: |
+          sed -e "s#{AKI_RELEASE_VERSION}#${{ steps.release-prep.outputs.VERSION }}#g" ./tools/validation/docker-compose-standalone-release-env.yml.tpl > /tmp/release-assets/docker-compose-validation.yml
+
+      - name: Release Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: false
+          prerelease: ${{ steps.release-prep.outputs.PRERELEASE }}
+          files: /tmp/release-assets/docker-compose-validation.yml
+
+

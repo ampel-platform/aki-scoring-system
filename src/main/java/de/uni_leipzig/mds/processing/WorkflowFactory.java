@@ -48,7 +48,7 @@ public final class WorkflowFactory {
      *
      * @return The {@link Workflow} instance.
      */
-    public static Workflow createAkiWorkflow() {
+    public static Workflow createAkiWorkflow(String scoringSystemName, String scoringSystemVersion) {
         var summaryBuilder = Summary.builder();
 
         return Workflow.workflow("aki-ruleset",
@@ -264,8 +264,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.GREEN)
@@ -294,8 +294,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.GREEN)
@@ -328,8 +328,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.YELLOW)
@@ -363,8 +363,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.YELLOW)
@@ -398,8 +398,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.YELLOW)
@@ -433,8 +433,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.RED)
@@ -468,8 +468,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.RED)
@@ -504,8 +504,8 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
-                                                        .scoringSystemName("AKI")
-                                                        .scoringSystemVersion("v0.1.0")
+                                                        .scoringSystemName(scoringSystemName)
+                                                        .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
                                                         .medicalCaseId(medicalCase.caseId())
                                                         .resultStatus(ResultAmpelStatus.RED)
