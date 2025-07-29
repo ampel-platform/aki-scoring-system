@@ -86,7 +86,7 @@ jobs:
     needs: [ build-scoring-system, test-scoring-system, build-validation-tool ]
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - uses: actions/checkout@v4
