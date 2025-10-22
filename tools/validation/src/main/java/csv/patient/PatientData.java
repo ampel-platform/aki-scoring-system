@@ -19,6 +19,12 @@ public final class PatientData {
     @CsvBindByName(column = "patientId")
     private String id;
 
+    @CsvBindByName(column = "firstname")
+    private String firstname;
+
+    @CsvBindByName(column = "lastname")
+    private String lastname;
+
     @CsvCustomBindByName(column = "sex", converter = PatientSexConverter.class)
     private PatientSex sex;
 
@@ -49,6 +55,8 @@ public final class PatientData {
         return new PatientMessage(
                 id,
                 mapPatientSex(),
+                firstname,
+                lastname,
                 dateOfBirth,
                 deceased,
                 creationDate,
@@ -67,10 +75,12 @@ public final class PatientData {
     }
 
     public String toString() {
-        return "ID: %s | Sex: %s | DOB: %s | Deceased: %s | Discharge Time: %s | Cancellation Date: %s | Creation Date: %s | Update Date: %s"
+        return "ID: %s | Sex: %s | Firstname: %s | Lastname: %s | DOB: %s | Deceased: %s | Discharge Time: %s | Cancellation Date: %s | Creation Date: %s | Update Date: %s"
                 .formatted(
                         getId()
                         , getSex()
+                        , getFirstname()
+                        , getLastname()
                         , getDateOfBirth()
                         , getDeceased()
                         , getDischargeTimestamp()

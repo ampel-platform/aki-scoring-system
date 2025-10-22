@@ -8,6 +8,8 @@ import java.time.LocalDateTime;
 public record Patient(
         // let MongoDB use its own internal ObjectId for references.
         String patientId,
+        String firstname,
+        String lastname,
         LocalDate dateOfBirth,
         Boolean deceased,
         LocalDateTime dischargeTime,
@@ -19,13 +21,16 @@ public record Patient(
 ) {
 
     public Patient(String id,
+                   String firstname,
+                   String lastname,
                    LocalDate dateOfBirth,
                    Boolean deceased,
                    LocalDateTime dischargeTime) {
-        this(id, dateOfBirth, deceased, dischargeTime, null);
+        this(id, firstname, lastname, dateOfBirth, deceased, dischargeTime, null);
     }
 
     public Patient(Patient patient, LocalDateTime ingestionTime) {
-        this(patient.patientId, patient.dateOfBirth, patient.deceased, ingestionTime);
+        this(patient.patientId, patient.firstname, patient.lastname, patient.dateOfBirth, patient.deceased,
+                ingestionTime);
     }
 }
