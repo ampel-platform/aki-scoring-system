@@ -29,6 +29,8 @@ public final class PatientMessageHandler implements MessageHandler<PatientMessag
         messagePersistenceHandler.writePatient(
                 new Patient(
                         patientMessagePayload.patientId(),
+                        patientMessagePayload.firstname(),
+                        patientMessagePayload.lastname(),
                         patientMessagePayload.dateOfBirth(),
                         patientMessagePayload.deceased(),
                         patientMessagePayload.dischargeTimestamp()));
