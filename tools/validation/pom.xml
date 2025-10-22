@@ -32,7 +32,7 @@
         <dependency>
             <groupId>de.uni_leipzig.ampel</groupId>
             <artifactId>sdk</artifactId>
-            <version>0.6.0</version>
+            <version>0.7.0</version>
         </dependency>
 
         <dependency>

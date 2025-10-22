@@ -3,6 +3,7 @@ package de.uni_leipzig.mds.processing;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.protobuf.InvalidProtocolBufferException;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Step;
@@ -637,7 +638,7 @@ public final class WorkflowFactory {
             InvalidProtocolBufferException {
         var mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
-
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         var obj = mapper.createObjectNode();
         obj.putPOJO("workflowSummary", summary);
