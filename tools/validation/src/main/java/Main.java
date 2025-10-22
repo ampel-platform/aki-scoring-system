@@ -289,7 +289,7 @@ public class Main {
         log.info("remaining expected results to be checked: #{}", orderIdResultMapping.size());
 
         for (ResultMessage res : resultMessages) {
-            var resultOrderId = res.meta().get("workflowSummary").get("order_id").asText();
+            var resultOrderId = res.orderId();
             log.info("validating result for orderId: '{}'", resultOrderId);
 
             var resSeverity = res.severityRepresentation() == null
