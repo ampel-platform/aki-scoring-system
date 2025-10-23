@@ -3,6 +3,7 @@ package de.uni_leipzig.mds.processing;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.protobuf.InvalidProtocolBufferException;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Step;
@@ -60,7 +61,6 @@ public final class WorkflowFactory {
                                     var triggerValue = medicalCase.getLatestCreatinineValue().get();
 
                                     summaryBuilder.patientDateOfBirth(medicalCase.patient().dateOfBirth());
-                                    summaryBuilder.orderId(triggerValue.orderId());
                                     return Either.right(Optional.of(
                                             inputParams.set(TRIGGER_ANALYTE, triggerValue)
                                     ));
@@ -264,6 +264,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -294,6 +295,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -328,6 +330,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -363,6 +366,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -398,6 +402,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -433,6 +438,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -468,6 +474,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -504,6 +511,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
                                                         .patientId(medicalCase.patient().id())
@@ -630,7 +638,7 @@ public final class WorkflowFactory {
             InvalidProtocolBufferException {
         var mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
-
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
         var obj = mapper.createObjectNode();
         obj.putPOJO("workflowSummary", summary);
@@ -640,8 +648,6 @@ public final class WorkflowFactory {
     @Data
     @Builder
     private static class Summary {
-        @JsonProperty("order_id")
-        private final String orderId;
         @JsonProperty("patient_date_of_birth")
         private final LocalDate patientDateOfBirth;
         @JsonProperty("min_cre_48")
