@@ -27,6 +27,7 @@ import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Factory for creating a {@link Workflow} that can run an evaluation for acute kidney injury (AKI).
@@ -264,6 +265,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
@@ -295,6 +297,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
@@ -330,6 +333,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
@@ -366,6 +370,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
@@ -402,6 +407,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
@@ -438,6 +444,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
@@ -474,6 +481,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
@@ -511,6 +519,7 @@ public final class WorkflowFactory {
                                                 medicalCase.caseId(),
                                                 null,
                                                 ResultMessage.builder()
+                                                        .id(UUID.randomUUID())
                                                         .orderId(triggerValue.orderId())
                                                         .scoringSystemName(scoringSystemName)
                                                         .scoringSystemVersion(scoringSystemVersion)
