@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static de.uni_leipzig.ampel.sdk.io.kafka.KafkaConsumerConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET;
+import static de.uni_leipzig.ampel.sdk.io.kafka.KafkaConsumerConfig.KafkaReaderConfigItem.GROUP_ID;
 import static java.lang.System.getenv;
 import static java.util.Objects.requireNonNull;
 import static java.util.Objects.requireNonNullElse;
@@ -56,14 +58,6 @@ public class Main {
                 WorkflowScheduler.createVirtualWorkflowScheduler()
         ));
 
-
-        var sharedTopicReaderConfig = KafkaReaderConfig.builder()
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, kafkaConsumerGroupId)
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, kafkaConsumerCommitTimeoutMs)
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
-                .build();
-
-
         var dbConnSettings = new DBConnectionSettings(mongoDBHost, mongoDBPort, mongoDBName);
         var mongoClient = RepositoryFactory.getMongoClient(dbConnSettings.getConnectionString());
         var mongoDatabase = RepositoryFactory.getMongoDatabase(dbConnSettings.getConnectionString());
@@ -90,20 +84,28 @@ public class Main {
                 workflowTriggerListener::onLaboratoryEvaluationMessagesPersisted);
 
         var patientMessageHandler = new PatientMessageHandler(messagePersistenceHandler);
-        var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, kafkaBootstrapServers, sharedTopicReaderConfig,
-                patientMessageHandler, PatientMessage.class);
+        var patientKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.PATIENTS, PatientMessage.class,
+                kafkaConsumerGroupId);
+        var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, patientKafkaConsumer, patientMessageHandler,
+                kafkaConsumerCommitTimeoutMs);
 
         var medicalCaseMessageHandler = new MedicalCaseMessageHandler(messagePersistenceHandler);
-        var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, kafkaBootstrapServers,
-                sharedTopicReaderConfig, medicalCaseMessageHandler, MedCaseMessage.class);
+        var medicalCaseKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.MEDICAL_CASES,
+                MedCaseMessage.class, kafkaConsumerGroupId);
+        var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, medicalCaseKafkaConsumer,
+                medicalCaseMessageHandler, kafkaConsumerCommitTimeoutMs);
 
         var labMessageHandler = new LaboratoryMessageHandler(messagePersistenceHandler);
-        var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, kafkaBootstrapServers, sharedTopicReaderConfig,
-                labMessageHandler, LaboratoryMessage.class);
+        var labKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.LABORATORY, LaboratoryMessage.class,
+                kafkaConsumerGroupId);
+        var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, labKafkaConsumer, labMessageHandler,
+                kafkaConsumerCommitTimeoutMs);
 
         var procedureMessageHandler = new ProcedureMessageHandler(messagePersistenceHandler);
-        var procedureTopicReader = getTopicReader(KafkaTopics.PROCEDURES, kafkaBootstrapServers,
-                sharedTopicReaderConfig, procedureMessageHandler, ProcedureMessage.class);
+        var procedureKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.PROCEDURES,
+                ProcedureMessage.class, kafkaConsumerGroupId);
+        var procedureTopicReader = getTopicReader(KafkaTopics.PROCEDURES, procedureKafkaConsumer,
+                procedureMessageHandler, kafkaConsumerCommitTimeoutMs);
 
         var resultPublisher = KafkaWriter.<String, ResultMessage>builder()
                 .useBootstrapServers(kafkaBootstrapServers)
@@ -133,18 +135,36 @@ public class Main {
         resultPublisher.run();
     }
 
-    private static <T> Thread getTopicReader(KafkaTopics topic, String bootstrapServers, KafkaReaderConfig readerConfig,
-                                             MessageHandler<T> messageHandler, Class<T> messageType) {
-        return new Thread(KafkaReader.<String, T>builder()
+    private static <T> Thread getTopicReader(KafkaTopics topic,
+                                             ThreadSafeKafkaConsumer<String, T> kafkaConsumer,
+                                             MessageHandler<T> messageHandler,
+                                             long commitTimeoutMs) {
+        var reader = KafkaReader.<String, T>builder()
+                .forTopic(topic)
+                .withKafkaConsumer(kafkaConsumer)
+                .withMessageHandler(kMsg -> messageHandler.handleMessage(kMsg.message()))
+                .withOffsetCommitStrategy(new ImmediateOffsetCommitStrategy<>(kafkaConsumer, commitTimeoutMs))
+                .build();
+
+        return new Thread(reader);
+    }
+
+    private static <T> ThreadSafeKafkaConsumer<String, T> getKafkaConsumer(String bootstrapServers,
+                                                                           KafkaTopics topic,
+                                                                           Class<T> messageType,
+                                                                           String consumerGroupId) {
+        return ThreadSafeKafkaConsumer.<String, T>builder()
                 .useBootstrapServers(bootstrapServers)
                 .forTopic(topic)
-                .withKafkaReaderConfig(readerConfig)
                 .withDeserializationStrategy(
                         new KafkaDeserializationStrategy<>(
                                 new StringDeserializer(),
                                 KafkaSerde.createKafkaDeserializer(messageType)))
-                .withMessageConsumer(
-                        messageHandler::handleMessage)
-                .build());
+                .withKafkaConsumerConfig(
+                        KafkaConsumerConfig.builder()
+                                .setConfigItem(GROUP_ID, consumerGroupId)
+                                .setConfigItem(AUTO_OFFSET_RESET, "earliest")
+                                .build())
+                .build();
     }
 }

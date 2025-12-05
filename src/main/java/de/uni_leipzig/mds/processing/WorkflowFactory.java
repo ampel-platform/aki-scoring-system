@@ -5,7 +5,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.google.protobuf.InvalidProtocolBufferException;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Step;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Transition;
 import de.uni_leipzig.ampel.sdk.evaluation.workflow.Workflow;
@@ -21,9 +20,8 @@ import lombok.Data;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Instant;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.Optional;
@@ -86,7 +84,8 @@ public final class WorkflowFactory {
                             var previousCreValueExists = !medicalCase.getCreatinineValuesDesc().stream()
                                     .skip(1)
                                     .takeWhile(labValue -> labValue.measuringTime()
-                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            .isAfter(triggerValue.measuringTime()
+                                                    .minus(168, ChronoUnit.HOURS))
                                             && labValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .toList()
                                     .isEmpty();
@@ -103,14 +102,16 @@ public final class WorkflowFactory {
                             var minCre168 = medicalCase.getCreatinineValuesDesc().stream()
                                     .skip(1)
                                     .filter(labValue -> labValue.measuringTime()
-                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            .isAfter(triggerValue.measuringTime()
+                                                    .minus(168, ChronoUnit.HOURS))
                                             && labValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .min(Comparator.comparing(WorkflowLabValue::analyteValue));
 
                             var minCre48 = medicalCase.getCreatinineValuesDesc().stream()
                                     .skip(1)
                                     .filter(labValue -> labValue.measuringTime()
-                                            .isAfter(triggerValue.measuringTime().minusHours(48))
+                                            .isAfter(triggerValue.measuringTime()
+                                                    .minus(48, ChronoUnit.HOURS))
                                             && labValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .min(Comparator.comparing(WorkflowLabValue::analyteValue));
 
@@ -165,7 +166,8 @@ public final class WorkflowFactory {
 
                             var numDialysis168 = medicalCase.procedures().stream()
                                     .filter(procedure -> (
-                                            procedure.conductTime().isAfter(triggerValue.measuringTime().minusHours(168))
+                                            procedure.conductTime().isAfter(triggerValue.measuringTime()
+                                                    .minus(168, ChronoUnit.HOURS))
                                                     && procedure.conductTime().isBefore(triggerValue.measuringTime())
                                     ))
                                     .count();
@@ -210,7 +212,8 @@ public final class WorkflowFactory {
 
                             var numVancomycinInLast168h = medicalCase.vancomycinValues().stream()
                                     .filter(vancoValue -> vancoValue.measuringTime()
-                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            .isAfter(triggerValue.measuringTime()
+                                                    .minus(168, ChronoUnit.HOURS))
                                             && vancoValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .count();
 
@@ -227,7 +230,8 @@ public final class WorkflowFactory {
 
                             var numVancomycinInLast168h = medicalCase.vancomycinValues().stream()
                                     .filter(vancoValue -> vancoValue.measuringTime()
-                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            .isAfter(triggerValue.measuringTime()
+                                                    .minus(168, ChronoUnit.HOURS))
                                             && vancoValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .count();
 
@@ -244,7 +248,8 @@ public final class WorkflowFactory {
 
                             var numVancomycinInLast168h = medicalCase.vancomycinValues().stream()
                                     .filter(vancoValue -> vancoValue.measuringTime()
-                                            .isAfter(triggerValue.measuringTime().minusHours(168))
+                                            .isAfter(triggerValue.measuringTime()
+                                                    .minus(168, ChronoUnit.HOURS))
                                             && vancoValue.measuringTime().isBefore(triggerValue.measuringTime()))
                                     .count();
 
@@ -276,12 +281,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -312,12 +317,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -349,12 +354,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -386,12 +391,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -423,12 +428,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -460,12 +465,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -498,12 +503,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -536,12 +541,12 @@ public final class WorkflowFactory {
                                                         .analyteValue(String.valueOf(triggerValue.analyteValue()))
                                                         .analyteValueUnit(triggerValue.analyteUnit())
                                                         .analyteMeasuringTime(triggerValue.measuringTime())
-                                                        .resultCreationDateTime(LocalDateTime.now(ZoneOffset.UTC))
+                                                        .resultCreationDateTime(Instant.now())
                                                         .meta(createSummaryInfoStruct(summaryBuilder.build()))
                                                         .build()
                                         )
                                 );
-                            } catch (JsonProcessingException | InvalidProtocolBufferException e) {
+                            } catch (JsonProcessingException e) {
                                 LOGGER.error("could not build summary information", e);
                             }
                             return Either.right(Optional.empty());
@@ -643,8 +648,7 @@ public final class WorkflowFactory {
                 .build();
     }
 
-    private static ObjectNode createSummaryInfoStruct(Summary summary) throws JsonProcessingException,
-            InvalidProtocolBufferException {
+    private static ObjectNode createSummaryInfoStruct(Summary summary) throws JsonProcessingException {
         var mapper = new ObjectMapper();
         mapper.findAndRegisterModules();
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
