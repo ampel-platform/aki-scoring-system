@@ -21,7 +21,7 @@ import util.PreProcessingUtil;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.InputStreamReader;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
@@ -29,6 +29,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Collectors;
 
+import static de.uni_leipzig.ampel.sdk.io.kafka.KafkaConsumerConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET;
+import static de.uni_leipzig.ampel.sdk.io.kafka.KafkaConsumerConfig.KafkaReaderConfigItem.GROUP_ID;
 import static java.lang.System.getenv;
 import static java.util.Objects.requireNonNull;
 
@@ -62,20 +64,20 @@ public class Main {
         labEvaluationData.removeAll(labEntriesWithNaNValues);
 
         // Using this as a sort of multimap due to the fact that some timestamps may occur several times
-        var timeBasedUploadFunctions = new HashMap<LocalDateTime, List<Callable<Void>>>(); // used for sorting
+        var timeBasedUploadFunctions = new HashMap<Instant, List<Callable<Void>>>(); // used for sorting
 
         // PATIENTS
         var patientMessageQueue = new LinkedBlockingQueue<Message<String, PatientMessage>>();
         patients.forEach(patient -> {
-            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(patient.getCreationDate()
-                    .atStartOfDay(), new ArrayList<>());
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(patient.creationDate(),
+                    new ArrayList<>());
 
             potentiallyExistingCallables.add(() -> {
-                log.info("uploading patient: {} - {}", patient.getId(), patient.getCreationDate().atStartOfDay());
+                log.info("uploading patient: {} - {}", patient.getId(), patient.getCreationDate());
                 patientMessageQueue.put(new Message<>(
                         patient.getId(),
                         new MessageHeader(
-                                patient.getCreationDate().atStartOfDay(),
+                                patient.creationDate(),
                                 "v1.0.0-validation",
                                 "validation-test"
                         ),
@@ -84,23 +86,22 @@ public class Main {
                 return null;
             });
 
-            timeBasedUploadFunctions.put(patient.getCreationDate().atStartOfDay(), potentiallyExistingCallables);
+            timeBasedUploadFunctions.put(patient.creationDate(), potentiallyExistingCallables);
         });
 
 
         // MEDICAL CASES
         var medicalCaseMessageQueue = new LinkedBlockingQueue<Message<String, MedCaseMessage>>();
         medicalCases.forEach(medicalCase -> {
-            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(medicalCase.getCreationDate()
-                    .atStartOfDay(), new ArrayList<>());
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(medicalCase.creationDate(),
+                    new ArrayList<>());
 
             potentiallyExistingCallables.add(() -> {
-                log.info("uploading medical case: {} - {}", medicalCase.getId(), medicalCase.getCreationDate()
-                        .atStartOfDay());
+                log.info("uploading medical case: {} - {}", medicalCase.getId(), medicalCase.getCreationDate());
                 medicalCaseMessageQueue.put(new Message<>(
                         medicalCase.getId(),
                         new MessageHeader(
-                                medicalCase.getCreationDate().atStartOfDay(),
+                                medicalCase.creationDate(),
                                 "v1.0.0-validation",
                                 "validation-test"
                         ),
@@ -109,14 +110,14 @@ public class Main {
                 return null;
             });
 
-            timeBasedUploadFunctions.put(medicalCase.getCreationDate().atStartOfDay(), potentiallyExistingCallables);
+            timeBasedUploadFunctions.put(medicalCase.creationDate(), potentiallyExistingCallables);
         });
 
 
         // PROCEDURES
         var procedureMessageQueue = new LinkedBlockingQueue<Message<String, ProcedureMessage>>();
         procedures.forEach(procedure -> {
-            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(procedure.getPerformedOn(),
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(procedure.performedOn(),
                     new ArrayList<>());
 
             potentiallyExistingCallables.add(() -> {
@@ -124,7 +125,7 @@ public class Main {
                         procedureMessageQueue.put(new Message<>(
                                 procedure.getMedicalCaseId(),
                                 new MessageHeader(
-                                        procedure.getPerformedOn(),
+                                        procedure.performedOn(),
                                         "v1.0.0-validation",
                                         "validation-test"
                                 ),
@@ -134,14 +135,14 @@ public class Main {
                     }
             );
 
-            timeBasedUploadFunctions.put(procedure.getPerformedOn(), potentiallyExistingCallables);
+            timeBasedUploadFunctions.put(procedure.performedOn(), potentiallyExistingCallables);
         });
 
 
         // LABORATORY
         var laboratoryMessageQueue = new LinkedBlockingQueue<Message<String, LaboratoryMessage>>();
         labEvaluationData.forEach(lab -> {
-            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(lab.getMeasuredAt(),
+            var potentiallyExistingCallables = timeBasedUploadFunctions.getOrDefault(lab.measuredAt(),
                     new ArrayList<>());
 
             potentiallyExistingCallables.add(() -> {
@@ -149,7 +150,7 @@ public class Main {
                         laboratoryMessageQueue.put(new Message<>(
                                 lab.getMedicalCaseId(),
                                 new MessageHeader(
-                                        lab.getCreatedAt(),
+                                        lab.measuredAt(),
                                         "v1.0.0-validation",
                                         "validation-test"
                                 ),
@@ -159,7 +160,7 @@ public class Main {
                     }
             );
 
-            timeBasedUploadFunctions.put(lab.getMeasuredAt(), potentiallyExistingCallables);
+            timeBasedUploadFunctions.put(lab.measuredAt(), potentiallyExistingCallables);
         });
 
 
@@ -188,7 +189,7 @@ public class Main {
         var eventOccurrencesDesc = timeBasedUploadFunctions.keySet().stream().sorted().toList();
 
         // Execute
-        for (LocalDateTime time : eventOccurrencesDesc) {
+        for (Instant time : eventOccurrencesDesc) {
             var uploadFns = timeBasedUploadFunctions.get(time);
             for (Callable<Void> uploadFn : uploadFns) {
                 try {
@@ -226,31 +227,35 @@ public class Main {
 
 
         // READING BACK RESULTS
-        var resultReaderCfg = KafkaReaderConfig.builder()
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.GROUP_ID, "aki-validation-result")
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.COMMIT_TIMEOUT_MS, 5000L)
-                .setConfigItem(KafkaReaderConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET, "earliest")
-                .build();
-
         var timer = new Timer();
         var latch = new CountDownLatch(1);
         TimerTask timerTask = createCountdownTask(latch);
 
-        List<ResultMessage> resultMessages = new ArrayList<>();
-        var resultReader = KafkaReader.<String, ResultMessage>builder()
+        var resultKafkaConsumer = ThreadSafeKafkaConsumer.<String, ResultMessage>builder()
                 .useBootstrapServers(kafkaBootstrapServers)
                 .forTopic(KafkaTopics.AMPEL_RESULT)
-                .withKafkaReaderConfig(resultReaderCfg)
                 .withDeserializationStrategy(
                         new KafkaDeserializationStrategy<>(
                                 new StringDeserializer(),
                                 KafkaSerde.createKafkaDeserializer(ResultMessage.class)))
-                .withMessageConsumer(msg -> {
+                .withKafkaConsumerConfig(
+                        KafkaConsumerConfig.builder()
+                                .setConfigItem(GROUP_ID, "aki-validation-result")
+                                .setConfigItem(AUTO_OFFSET_RESET, "earliest")
+                                .build())
+                .build();
+
+        List<ResultMessage> resultMessages = new ArrayList<>();
+        var resultReader = KafkaReader.<String, ResultMessage>builder()
+                .forTopic(KafkaTopics.AMPEL_RESULT)
+                .withKafkaConsumer(resultKafkaConsumer)
+                .withMessageHandler(msg -> {
                     timerTask.cancel();
                     timer.purge();
-                    resultMessages.add(msg.body());
+                    resultMessages.add(msg.message().body());
                     timer.schedule(createCountdownTask(latch), 10000);
                 })
+                .withOffsetCommitStrategy(new ImmediateOffsetCommitStrategy<>(resultKafkaConsumer, 5000L))
                 .build();
 
         log.info("starting result message reader");
