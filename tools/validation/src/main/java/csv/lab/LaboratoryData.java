@@ -6,7 +6,9 @@ import com.opencsv.bean.CsvDate;
 import de.uni_leipzig.ampel.sdk.io.message.laboratory.LaboratoryMessage;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 @Getter
 @NoArgsConstructor
@@ -67,13 +69,17 @@ public final class LaboratoryData {
                 medicalCaseId,
                 patientId,
                 orderId,
-                createdAt,
+                createdAt.toInstant(ZoneOffset.UTC),
                 originatingSystem,
                 analyte,
                 analyteValue,
                 analyteUnit,
-                measuredAt
+                measuredAt.toInstant(ZoneOffset.UTC)
         );
+    }
+
+    public Instant measuredAt() {
+        return measuredAt.toInstant(ZoneOffset.UTC);
     }
 
     public String toString() {

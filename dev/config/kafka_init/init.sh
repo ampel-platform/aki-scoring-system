@@ -29,3 +29,29 @@ create_topic_with_config "AMPEL_PATIENTS" keep_forever_config
 create_topic_with_config "AMPEL_CASES" keep_forever_config
 create_topic_with_config "AMPEL_LABORATORY" keep_forever_config
 create_topic_with_config "AMPEL_PROCEDURES" keep_forever_config
+
+
+# POPULATE TOPICS WITH DATA --------------------------------------------------------------------------------------------
+
+echo "Populating topic with data..."
+
+for file in /tmp/bootstrap_data/*.ndjson; do
+  TOPIC_NAME=$(basename $file .ndjson)
+
+  /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:29092 --list | grep -q "${TOPIC_NAME}"
+  if [ $? -ne 0 ]; then
+    echo "Cannot populate topic '${TOPIC_NAME}' with data since it does not exist yet"
+    continue
+  fi
+
+  echo -n "Populating topic '${TOPIC_NAME}' with data..."
+  /opt/kafka/bin/kafka-console-producer.sh --bootstrap-server kafka:29092 --topic "$TOPIC_NAME" < "$file"
+
+  if [ $? -ne 0 ]; then
+    echo "FAILED"
+    exit 1
+  else
+    echo "DONE"
+  fi
+done
+

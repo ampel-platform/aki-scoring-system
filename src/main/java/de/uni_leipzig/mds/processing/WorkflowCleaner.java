@@ -8,7 +8,7 @@ import de.uni_leipzig.mds.db.LaboratoryEvaluationWriter;
 import de.uni_leipzig.mds.db.ProcedureWriter;
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 
 import static de.uni_leipzig.mds.util.PreconditionChecks.neitherNullNorBlank;
@@ -30,7 +30,7 @@ public final class WorkflowCleaner {
         this.procedureWriter = requireNonNull(procedureWriter, "procedure writer must not be null");
     }
 
-    public void expireEntriesInMedicalCaseOlderThan(String medicalCaseId, LocalDateTime t) {
+    public void expireEntriesInMedicalCaseOlderThan(String medicalCaseId, Instant t) {
         neitherNullNorBlank(medicalCaseId, "medical case ID must neither be null nor blank");
         requireNonNull(t, "timestamp must not be null");
 

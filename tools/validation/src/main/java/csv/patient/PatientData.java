@@ -7,8 +7,11 @@ import de.uni_leipzig.ampel.sdk.io.message.patient.PatientMessage;
 import de.uni_leipzig.ampel.sdk.io.message.patient.Sex;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.Optional;
 
 @Getter
 @NoArgsConstructor
@@ -59,10 +62,14 @@ public final class PatientData {
                 lastname,
                 dateOfBirth,
                 deceased,
-                creationDate,
-                dischargeTimestamp,
-                cancellationDate,
-                updateDate
+                creationDate.atStartOfDay().toInstant(ZoneOffset.UTC),
+                dischargeTimestamp.toInstant(ZoneOffset.UTC),
+                (cancellationDate != null)
+                        ? Optional.of(cancellationDate.atStartOfDay().toInstant(ZoneOffset.UTC))
+                        : Optional.empty(),
+                (updateDate != null)
+                        ? Optional.of(updateDate.atStartOfDay().toInstant(ZoneOffset.UTC))
+                        : Optional.empty()
         );
     }
 
@@ -72,6 +79,10 @@ public final class PatientData {
             case MALE -> Sex.MALE;
             default -> Sex.UNKNOWN;
         };
+    }
+
+    public Instant creationDate() {
+        return creationDate.atStartOfDay().toInstant(ZoneOffset.UTC);
     }
 
     public String toString() {

@@ -1,6 +1,6 @@
 services:
   kafka:
-    image: 'apache/kafka:4.0.0@sha256:3f7b939115cd4872e9cee9369d80bd69712fde55f9902f46d793f64848dedc75'
+    image: 'apache/kafka:4.1.1@sha256:0bc1bb2478f45b6cea78864df86acdc11e8df2c5172477819a4d12942cbe5d40'
     hostname: kafka
     container_name: kafka
     ports:
