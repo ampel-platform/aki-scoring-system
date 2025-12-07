@@ -22,6 +22,8 @@ import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.Optional;
@@ -48,7 +50,7 @@ public final class WorkflowFactory {
      *
      * @return The {@link Workflow} instance.
      */
-    public static Workflow createAkiWorkflow(String scoringSystemName, String scoringSystemVersion) {
+    public static Workflow createAkiWorkflow(String scoringSystemName, String scoringSystemVersion, ZoneId timezone) {
         var summaryBuilder = Summary.builder();
 
         return Workflow.workflow("aki-ruleset",
@@ -69,7 +71,13 @@ public final class WorkflowFactory {
                             var medicalCase = (WorkflowMedicalCase) inputParams.get(MEDICAL_CASE_PARAM);
                             var triggerValue = (WorkflowLabValue) inputParams.get(TRIGGER_ANALYTE);
 
-                            var ageYears = Math.abs(ChronoUnit.YEARS.between(triggerValue.measuringTime(),
+                            // Transformation needs to happen here in order to compare LocalDates (date of birth) with
+                            // Instants (measuring time). We simply assume that the patient was born in the same
+                            // timezone as the service is configured in since this is what would happen in the offline
+                            // world as well (nobody is checking timezones when an ID is presented).
+                            var localMeasuringTime = LocalDateTime.ofInstant(triggerValue.measuringTime(), timezone);
+
+                            var ageYears = Math.abs(ChronoUnit.YEARS.between(localMeasuringTime,
                                     medicalCase.patient().dateOfBirth().atStartOfDay()));
 
                             return Either.right(Optional.of(

@@ -18,6 +18,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.time.ZoneId;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import static de.uni_leipzig.ampel.sdk.io.kafka.KafkaConsumerConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET;
@@ -39,6 +40,7 @@ public class Main {
                 "timeout in ms must be specified"));
         var messageBufferSize = Integer.parseInt(requireNonNullElse(getenv("MESSAGE_BUFFER_SIZE"), "100000"));
         var persistenceFlushTimeoutMs = Long.parseLong(requireNonNullElse(getenv("MESSAGE_PERSISTENCE_FLUSH_TIMEOUT_MS"), "200"));
+        var timezone = ZoneId.of(requireNonNullElse(getenv("TIMEZONE"), ZoneId.systemDefault().getId()));
 
         var scoringSystemMetaInformation = MetaInformation.readFromPropertyStream(
                 Main.class.getClassLoader().getResourceAsStream("app.properties"));
@@ -53,7 +55,8 @@ public class Main {
                         scoringSystemMetaInformation.getProperty(MetaInformationProperty.NAME)
                                 .orElse("AKI"),
                         scoringSystemMetaInformation.getProperty(MetaInformationProperty.VERSION)
-                                .orElse("latest")
+                                .orElse("latest"),
+                        timezone
                 ),
                 WorkflowScheduler.createVirtualWorkflowScheduler()
         ));
