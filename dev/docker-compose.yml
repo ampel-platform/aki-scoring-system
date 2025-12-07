@@ -1,7 +1,6 @@
-version: "3.8"
 services:
   kafka:
-    image: apache/kafka:4.0.0@sha256:3f7b939115cd4872e9cee9369d80bd69712fde55f9902f46d793f64848dedc75
+    image: apache/kafka:4.1.1@sha256:0bc1bb2478f45b6cea78864df86acdc11e8df2c5172477819a4d12942cbe5d40
     hostname: kafka
     container_name: kafka
     ports:
@@ -22,8 +21,6 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
       CLUSTER_ID: "pW0o31_zTWqplLKY9UDTQg"
-    volumes:
-      - ./data/kafka_addins:/tmp/kafka_addins:ro
     healthcheck:
       test: nc -z kafka 29092 || exit -1
       start_period: 180s
@@ -32,7 +29,7 @@ services:
       retries: 5
 
   kafka-topic-init:
-    image: 'apache/kafka:4.0.0@sha256:3f7b939115cd4872e9cee9369d80bd69712fde55f9902f46d793f64848dedc75'
+    image: 'apache/kafka:4.1.1@sha256:0bc1bb2478f45b6cea78864df86acdc11e8df2c5172477819a4d12942cbe5d40'
     restart: no
     depends_on:
       kafka:
@@ -42,6 +39,7 @@ services:
     command: [ '/opt/init.sh' ]
     volumes:
       - ./config/kafka_init/init.sh:/opt/init.sh:ro
+      - ./config/kafka_init/bootstrap_data/:/tmp/bootstrap_data/:ro
 
   kafka-ui:
     image: provectuslabs/kafka-ui:v0.7.2@sha256:8f2ff02d64b0a7a2b71b6b3b3148b85f66d00ec20ad40c30bdcd415d46d31818
@@ -60,5 +58,11 @@ services:
     environment:
       MONGO_INITDB_DATABASE: "aki-test-db"
       TZ: "Europe/Berlin"
+    healthcheck:
+      test: mongosh --eval 'db.runCommand("ping").ok' --quiet
+      interval: 10s
+      start_period: 30s
+      timeout: 15s
+      retries: 3
 
 
