@@ -20,6 +20,8 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.time.ZoneId;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
 
 import static de.uni_leipzig.ampel.sdk.io.kafka.KafkaConsumerConfig.KafkaReaderConfigItem.AUTO_OFFSET_RESET;
 import static de.uni_leipzig.ampel.sdk.io.kafka.KafkaConsumerConfig.KafkaReaderConfigItem.GROUP_ID;
@@ -38,6 +40,8 @@ public class Main {
         var kafkaConsumerGroupId = requireNonNull(getenv("KAFKA_CONSUMER_GROUP_ID"), "Kafka consumer group id must be specified");
         var kafkaConsumerCommitTimeoutMs = Long.parseLong(requireNonNull(getenv("KAFKA_CONSUMER_COMMIT_TIMEOUT_MS"), "Kafka consumer commit " +
                 "timeout in ms must be specified"));
+        var kafkaConsumerCommitIntervalMs = Long.parseLong(requireNonNull(getenv("KAFKA_CONSUMER_COMMIT_INTERVAL_MS"), "Kafka consumer " +
+                "commit interval in ms must be specified"));
         var messageBufferSize = Integer.parseInt(requireNonNullElse(getenv("MESSAGE_BUFFER_SIZE"), "100000"));
         var persistenceFlushTimeoutMs = Long.parseLong(requireNonNullElse(getenv("MESSAGE_PERSISTENCE_FLUSH_TIMEOUT_MS"), "200"));
         var timezone = ZoneId.of(requireNonNullElse(getenv("TIMEZONE"), ZoneId.systemDefault().getId()));
@@ -86,29 +90,33 @@ public class Main {
         messagePersistenceHandler.registerLabEvaluationPersistedProspect(
                 workflowTriggerListener::onLaboratoryEvaluationMessagesPersisted);
 
+        var commitExecutorService = new ScheduledThreadPoolExecutor(4); // since we have 4 sources
+
         var patientMessageHandler = new PatientMessageHandler(messagePersistenceHandler);
         var patientKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.PATIENTS, PatientMessage.class,
                 kafkaConsumerGroupId);
         var patientTopicReader = getTopicReader(KafkaTopics.PATIENTS, patientKafkaConsumer, patientMessageHandler,
-                kafkaConsumerCommitTimeoutMs);
+                kafkaConsumerCommitTimeoutMs, kafkaConsumerCommitIntervalMs, commitExecutorService);
 
         var medicalCaseMessageHandler = new MedicalCaseMessageHandler(messagePersistenceHandler);
         var medicalCaseKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.MEDICAL_CASES,
                 MedCaseMessage.class, kafkaConsumerGroupId);
         var medicalCaseTopicReader = getTopicReader(KafkaTopics.MEDICAL_CASES, medicalCaseKafkaConsumer,
-                medicalCaseMessageHandler, kafkaConsumerCommitTimeoutMs);
+                medicalCaseMessageHandler, kafkaConsumerCommitTimeoutMs, kafkaConsumerCommitIntervalMs,
+                commitExecutorService);
 
         var labMessageHandler = new LaboratoryMessageHandler(messagePersistenceHandler);
         var labKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.LABORATORY, LaboratoryMessage.class,
                 kafkaConsumerGroupId);
         var labTopicReader = getTopicReader(KafkaTopics.LABORATORY, labKafkaConsumer, labMessageHandler,
-                kafkaConsumerCommitTimeoutMs);
+                kafkaConsumerCommitTimeoutMs, kafkaConsumerCommitIntervalMs, commitExecutorService);
 
         var procedureMessageHandler = new ProcedureMessageHandler(messagePersistenceHandler);
         var procedureKafkaConsumer = getKafkaConsumer(kafkaBootstrapServers, KafkaTopics.PROCEDURES,
                 ProcedureMessage.class, kafkaConsumerGroupId);
         var procedureTopicReader = getTopicReader(KafkaTopics.PROCEDURES, procedureKafkaConsumer,
-                procedureMessageHandler, kafkaConsumerCommitTimeoutMs);
+                procedureMessageHandler, kafkaConsumerCommitTimeoutMs, kafkaConsumerCommitIntervalMs,
+                commitExecutorService);
 
         var resultPublisher = KafkaWriter.<String, ResultMessage>builder()
                 .useBootstrapServers(kafkaBootstrapServers)
@@ -141,12 +149,18 @@ public class Main {
     private static <T> Thread getTopicReader(KafkaTopics topic,
                                              ThreadSafeKafkaConsumer<String, T> kafkaConsumer,
                                              MessageHandler<T> messageHandler,
-                                             long commitTimeoutMs) {
+                                             long commitTimeoutMs,
+                                             long commitIntervalMs,
+                                             ScheduledExecutorService executorService) {
         var reader = KafkaReader.<String, T>builder()
                 .forTopic(topic)
                 .withKafkaConsumer(kafkaConsumer)
                 .withMessageHandler(kMsg -> messageHandler.handleMessage(kMsg.message()))
-                .withOffsetCommitStrategy(new ImmediateOffsetCommitStrategy<>(kafkaConsumer, commitTimeoutMs))
+                .withOffsetCommitStrategy(new IntervalBasedOffsetCommitStrategy<>(
+                        kafkaConsumer,
+                        commitTimeoutMs,
+                        commitIntervalMs,
+                        executorService))
                 .build();
 
         return new Thread(reader);
