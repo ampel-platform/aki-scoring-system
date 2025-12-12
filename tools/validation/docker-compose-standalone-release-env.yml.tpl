@@ -53,6 +53,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
       KAFKA_CONSUMER_GROUP_ID: "aki-service-validation"
       KAFKA_CONSUMER_COMMIT_TIMEOUT_MS: 5000
+      KAFKA_CONSUMER_COMMIT_INTERVAL_MS: 30000
 
   mongo:
     image: mongo:8.0.11-noble@sha256:29f2124655aa6eab4e413cced7d1128d1b8da2022e3c92931281e95c792e3e4b
