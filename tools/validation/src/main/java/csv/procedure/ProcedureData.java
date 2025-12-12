@@ -5,8 +5,11 @@ import com.opencsv.bean.CsvDate;
 import de.uni_leipzig.ampel.sdk.io.message.procedure.ProcedureMessage;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
+import java.util.Optional;
 
 @Getter
 @NoArgsConstructor
@@ -40,10 +43,18 @@ public final class ProcedureData {
                 id,
                 medicalCaseId,
                 code,
-                performedOn,
-                cancellationDate,
-                updateDate
+                performedOn.toInstant(ZoneOffset.UTC),
+                (cancellationDate != null)
+                        ? Optional.of(cancellationDate.atStartOfDay().toInstant(ZoneOffset.UTC))
+                        : Optional.empty(),
+                (updateDate != null)
+                        ? Optional.of(updateDate.atStartOfDay().toInstant(ZoneOffset.UTC))
+                        : Optional.empty()
         );
+    }
+
+    public Instant performedOn() {
+        return performedOn.toInstant(ZoneOffset.UTC);
     }
 
     public String toString() {

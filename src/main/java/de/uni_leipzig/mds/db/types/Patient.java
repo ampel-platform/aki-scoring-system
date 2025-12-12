@@ -2,6 +2,7 @@ package de.uni_leipzig.mds.db.types;
 
 import org.bson.codecs.pojo.annotations.BsonProperty;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
@@ -12,7 +13,7 @@ public record Patient(
         String lastname,
         LocalDate dateOfBirth,
         Boolean deceased,
-        LocalDateTime dischargeTime,
+        Instant dischargeTime,
 
         // Necessary for dealing with duplicates since we are not doing upserts anymore.
         // The latest entry (associated with a specific id) will also have the latest ingestion time.
@@ -25,11 +26,11 @@ public record Patient(
                    String lastname,
                    LocalDate dateOfBirth,
                    Boolean deceased,
-                   LocalDateTime dischargeTime) {
+                   Instant dischargeTime) {
         this(id, firstname, lastname, dateOfBirth, deceased, dischargeTime, null);
     }
 
-    public Patient(Patient patient, LocalDateTime ingestionTime) {
+    public Patient(Patient patient, Instant ingestionTime) {
         this(patient.patientId, patient.firstname, patient.lastname, patient.dateOfBirth, patient.deceased,
                 ingestionTime);
     }

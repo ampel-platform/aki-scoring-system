@@ -46,7 +46,7 @@ public final class ProcedureMessageHandler implements MessageHandler<ProcedureMe
                         procedureMessagePayload.procedureId(),
                         procedureMessagePayload.procedureCode(),
                         procedureMessagePayload.performedOn(),
-                        procedureMessagePayload.cancellationDate())
+                        procedureMessagePayload.cancellationDate().orElse(null))
         );
     }
 

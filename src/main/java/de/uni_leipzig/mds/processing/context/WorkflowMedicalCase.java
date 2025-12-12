@@ -1,35 +1,34 @@
 package de.uni_leipzig.mds.processing.context;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
 public record WorkflowMedicalCase(
         String caseId,
-        LocalDate creationDate,
-        LocalDate cancellationDate,
+        Instant creationDate,
+        Instant cancellationDate,
         WorkflowPatient patient,
         List<WorkflowLabValue> creatinineValues,
         List<WorkflowLabValue> vancomycinValues,
         List<WorkflowProcedure> procedures
 ) {
     // TODO: add constructor for enforcing an existing caseId
-    public WorkflowMedicalCase filterForValuesBetween(LocalDateTime from, LocalDateTime to) {
+    public WorkflowMedicalCase filterForValuesBetween(Instant from, Instant to) {
         var timeFilteredCreatinineLabValues = creatinineValues.stream().filter(
-                        cv -> (cv.measuringTime().isEqual(from) || cv.measuringTime().isAfter(from))
-                                && (cv.measuringTime().isEqual(to) || cv.measuringTime().isBefore(to)))
+                        cv -> cv.measuringTime().compareTo(from) >= 0 // >= from
+                                && cv.measuringTime().compareTo(to) <= 0) // <= to
                 .toList();
 
         var timeFilteredVancomycinLabValues = vancomycinValues.stream().filter(
-                        vv -> (vv.measuringTime().isEqual(from) || vv.measuringTime().isAfter(from))
-                                && (vv.measuringTime().isEqual(to) || vv.measuringTime().isBefore(to)))
+                        vv -> vv.measuringTime().compareTo(from) >= 0 // >= from
+                                && vv.measuringTime().compareTo(to) <= 0) // <= to
                 .toList();
 
         var timeFilteredProcedures = procedures.stream().filter(
-                        p -> (p.conductTime().isEqual(from) || p.conductTime().isAfter(from))
-                                && (p.conductTime().isEqual(to) || p.conductTime().isBefore(to)))
+                        p -> p.conductTime().compareTo(from) >= 0 // >= from
+                                && p.conductTime().compareTo(to) <= 0) // <= to
                 .toList();
 
         return new WorkflowMedicalCase(

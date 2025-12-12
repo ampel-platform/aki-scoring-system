@@ -7,7 +7,10 @@ import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseMessage;
 import de.uni_leipzig.ampel.sdk.io.message.medcase.MedCaseStatus;
 import lombok.*;
 
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.util.Optional;
 
 @Getter
 @NoArgsConstructor
@@ -41,9 +44,13 @@ public final class MedicalCaseData {
                 id,
                 patientId,
                 mapMedicalCaseStatus(),
-                creationDate,
-                cancellationDate,
-                updateDate
+                creationDate.atStartOfDay().toInstant(ZoneOffset.UTC),
+                (cancellationDate != null)
+                        ? Optional.of(cancellationDate.atStartOfDay().toInstant(ZoneOffset.UTC))
+                        : Optional.empty(),
+                (updateDate != null)
+                        ? Optional.of(updateDate.atStartOfDay().toInstant(ZoneOffset.UTC))
+                        : Optional.empty()
         );
     }
 
@@ -53,6 +60,10 @@ public final class MedicalCaseData {
             case COMPLETED -> MedCaseStatus.COMPLETED;
             case PLANNED -> MedCaseStatus.PLANNED;
         };
+    }
+
+    public Instant creationDate() {
+        return creationDate.atStartOfDay().toInstant(ZoneOffset.UTC);
     }
 
     public String toString() {

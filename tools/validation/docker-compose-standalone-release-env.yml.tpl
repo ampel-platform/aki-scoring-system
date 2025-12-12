@@ -1,6 +1,6 @@
 services:
   kafka:
-    image: 'apache/kafka:4.0.0@sha256:3f7b939115cd4872e9cee9369d80bd69712fde55f9902f46d793f64848dedc75'
+    image: 'apache/kafka:4.1.1@sha256:0bc1bb2478f45b6cea78864df86acdc11e8df2c5172477819a4d12942cbe5d40'
     hostname: kafka
     container_name: kafka
     ports:
@@ -53,6 +53,7 @@ services:
       KAFKA_BOOTSTRAP_SERVERS: "kafka:29092"
       KAFKA_CONSUMER_GROUP_ID: "aki-service-validation"
       KAFKA_CONSUMER_COMMIT_TIMEOUT_MS: 5000
+      KAFKA_CONSUMER_COMMIT_INTERVAL_MS: 30000
 
   mongo:
     image: mongo:8.0.11-noble@sha256:29f2124655aa6eab4e413cced7d1128d1b8da2022e3c92931281e95c792e3e4b

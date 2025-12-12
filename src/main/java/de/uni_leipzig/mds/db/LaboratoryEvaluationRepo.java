@@ -7,7 +7,7 @@ import com.mongodb.client.model.bulk.ClientNamespacedInsertOneModel;
 import com.mongodb.client.model.bulk.ClientNamespacedWriteModel;
 import de.uni_leipzig.mds.db.types.LaboratoryEvaluation;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.stream.StreamSupport;
 
@@ -40,7 +40,7 @@ public final class LaboratoryEvaluationRepo implements LaboratoryEvaluationReade
 
     @Override
     public ClientNamespacedDeleteManyModel createDeleteCommandForLaboratoryEntriesInMedicalCaseOlderThan(
-            String medicalCaseId, LocalDateTime t) {
+            String medicalCaseId, Instant t) {
         neitherNullNorBlank(medicalCaseId, "medical case ID must neither be null nor blank");
         requireNonNull(t, "timestamp must not be null");
 

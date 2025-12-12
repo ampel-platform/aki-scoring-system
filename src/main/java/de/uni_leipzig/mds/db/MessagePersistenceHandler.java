@@ -10,7 +10,7 @@ import de.uni_leipzig.mds.db.types.Patient;
 import de.uni_leipzig.mds.db.types.Procedure;
 import lombok.extern.slf4j.Slf4j;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
@@ -81,7 +81,7 @@ public final class MessagePersistenceHandler {
 
     public void writePatient(Patient patient) {
         log.debug("defer persisting information for patient with ID `{}`", patient.patientId());
-        var patientWithIngestionTime = new Patient(patient, LocalDateTime.now());
+        var patientWithIngestionTime = new Patient(patient, Instant.now());
         try {
             pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.PATIENT,
@@ -94,7 +94,7 @@ public final class MessagePersistenceHandler {
 
     public void writeMedicalCase(MedicalCase medicalCase) {
         log.debug("defer persisting information for medical case with ID `{}`", medicalCase.medicalCaseId());
-        var medicalCaseWithIngestionTime = new MedicalCase(medicalCase, LocalDateTime.now());
+        var medicalCaseWithIngestionTime = new MedicalCase(medicalCase, Instant.now());
         try {
             pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.MEDICAL_CASE,
@@ -109,7 +109,7 @@ public final class MessagePersistenceHandler {
         log.debug("defer persisting information for laboratory evaluation with order ID `{}`",
                 laboratoryEvaluation.orderId());
         var laboratoryEvaluationWithIngestionTime = new LaboratoryEvaluation(laboratoryEvaluation,
-                LocalDateTime.now());
+                Instant.now());
         try {
             pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.LABORATORY_EVALUATION,
@@ -122,7 +122,7 @@ public final class MessagePersistenceHandler {
 
     public void writeProcedure(Procedure procedure) {
         log.debug("defer persisting information for procedure with ID `{}`", procedure.procedureId());
-        var procedureWithIngestionTime = new Procedure(procedure, LocalDateTime.now());
+        var procedureWithIngestionTime = new Procedure(procedure, Instant.now());
         try {
             pendingCommandsBuffer.put(new PendingCommand(
                     MessageType.PROCEDURE,

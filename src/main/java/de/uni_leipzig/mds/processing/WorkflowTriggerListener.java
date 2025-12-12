@@ -16,7 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.BlockingQueue;
@@ -62,7 +62,8 @@ public final class WorkflowTriggerListener {
                         triggerWorkflowRunWithCleanup(
                                 labEvaluation.medicalCaseId(),
                                 labEvaluation.orderId(),
-                                labEvaluation.measuringTime().minusDays(7),
+                                labEvaluation.measuringTime()
+                                        .minus(7, ChronoUnit.DAYS),
                                 labEvaluation.measuringTime());
                     }
                 });
@@ -146,8 +147,8 @@ public final class WorkflowTriggerListener {
     }
 
     private void triggerWorkflowRunWithCleanup(String medicalCaseId, String orderId,
-                                               LocalDateTime oldestConsideredDateTime,
-                                               LocalDateTime latestConsideredDateTime) {
+                                               Instant oldestConsideredDateTime,
+                                               Instant latestConsideredDateTime) {
         generateMedicalCaseForWorkflowRun(medicalCaseId, orderId)
                 .map(mc -> mc.filterForValuesBetween(
                         oldestConsideredDateTime,

@@ -31,6 +31,6 @@ public final class MedicalCaseMessageHandler implements MessageHandler<MedCaseMe
                         medicalCaseMessagePayload.caseId(),
                         medicalCaseMessagePayload.patientId(),
                         medicalCaseMessagePayload.creationDate(),
-                        medicalCaseMessagePayload.cancellationDate()));
+                        medicalCaseMessagePayload.cancellationDate().orElse(null)));
     }
 }

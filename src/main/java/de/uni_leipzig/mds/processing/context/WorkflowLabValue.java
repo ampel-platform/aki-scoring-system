@@ -1,6 +1,6 @@
 package de.uni_leipzig.mds.processing.context;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 public record WorkflowLabValue(
         String orderId,
@@ -8,6 +8,6 @@ public record WorkflowLabValue(
         double analyteValue,
         String analyteUnit,
         String originatingSystem,
-        LocalDateTime measuringTime
+        Instant measuringTime
 ) {
 }
